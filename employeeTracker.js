@@ -27,6 +27,7 @@ const showStartScreen = () => {
   console.log("|                            |___/                  |");
   console.log("|                                                   |");
   console.log("`---------------------------------------------------'");
+  console.log();
 };
 
 // get options
@@ -52,6 +53,7 @@ function start() {
     .then((answer) => {
       switch (answer.choice) {
         case "View All Employees":
+          viewAllEmployees();
           break;
         case "View All Employees By Department":
           break;
@@ -78,6 +80,34 @@ function start() {
         throw error;
       }
     });
+}
+
+function viewAllEmployees() {
+  connection.query(
+    `SELECT 
+    emp.id AS 'ID',
+    emp.first_name AS 'First Name',
+    emp.last_name AS 'Last Name',
+    role.title AS 'Title',
+    department.name as 'Department',
+    role.salary AS 'Salary',
+    CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
+FROM
+    employee emp
+        JOIN
+    role ON role_id = role.id
+        JOIN
+    department ON role.department_id = department.id
+        LEFT JOIN
+    employee mgr ON emp.manager_id = mgr.id
+ORDER BY emp.id;`,
+    (err, res) => {
+      if (err) throw err;
+      console.log();
+      console.table(res);
+      start();
+    }
+  );
 }
 
 // add department
