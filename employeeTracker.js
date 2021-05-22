@@ -11,9 +11,27 @@ const connection = mysql.createConnection({
   database: "employeeDB",
 });
 
+function showStartScreen() {
+  console.log(",---------------------------------------------------.");
+  console.log("|   _____                 _                         |");
+  console.log("|  | ____|_ __ ___  _ __ | | ___  _   _  ___  ___   |");
+  console.log("|  |  _| | '_ ` _ \\| '_ \\| |/ _ \\| | | |/ _ \\/ _ \\  |");
+  console.log("|  | |___| | | | | | |_) | | (_) | |_| |  __/  __/  |");
+  console.log("|  |_____|_| |_| |_| .__/|_|\\___/ \\__, |\\___|\\___|  |");
+  console.log("|                  |_|            |___/             |");
+  console.log("|   __  __                                          |");
+  console.log("|  |  \\/  | __ _ _ __   __ _  __ _  ___ _ __        |");
+  console.log("|  | |\\/| |/ _` | '_ \\ / _` |/ _` |/ _ \\ '__|       |");
+  console.log("|  | |  | | (_| | | | | (_| | (_| |  __/ |          |");
+  console.log("|  |_|  |_|\\__,_|_| |_|\\__,_|\\__, |\\___|_|          |");
+  console.log("|                            |___/                  |");
+  console.log("|                                                   |");
+  console.log("`---------------------------------------------------'");
+}
 // get options
 function start() {
-  console.log(start);
+  showStartScreen();
+
   connection.end();
 }
 
