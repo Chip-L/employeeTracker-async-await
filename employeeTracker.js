@@ -45,9 +45,9 @@ function start() {
           "View All Employees By Manager",
           new inquirer.Separator("-- EMPLOYEE --"),
           "Add Employee",
-          "Remove Employee",
-          "Update Employee Role",
           "Update Employee Manager",
+          "Update Employee Role",
+          "Remove Employee",
           new inquirer.Separator("-- OTHER --"),
           "Exit program",
           new inquirer.Separator(),
@@ -57,6 +57,7 @@ function start() {
     ])
     .then((answer) => {
       switch (answer.choice) {
+        // -- VIEWS --"
         case "View All Employees":
           viewAllEmployees();
           break;
@@ -69,14 +70,16 @@ function start() {
         case "View All Employees By Manager":
           viewEmployeesByManager();
           break;
+        // -- EMPLOYEE --
         case "Add Employee":
-          break;
-        case "Remove Employee":
-          break;
-        case "Update Employee Role":
           break;
         case "Update Employee Manager":
           break;
+        case "Update Employee Role":
+          break;
+        case "Remove Employee":
+          break;
+        // -- OTHER --
         default:
           connection.end();
       }
@@ -100,40 +103,40 @@ function start() {
 
 // view employees by department
 function viewEmployeesByDepartment() {
-  connection.query("SELECT * FROM department;", (err, res) => {
+  connection.query("SELECT * FROM department;", (err, deptList) => {
     if (err) throw err;
     inquirer
       .prompt({
         type: "list",
         message: "Which department would you like to view?",
-        choices: res.map((obj) => obj.name),
+        choices: deptList.map((obj) => obj.name),
         name: "choice",
       })
       .then((answer) => {
         connection.query(
           `SELECT 
-    emp.id,
-    emp.first_name,
-    emp.last_name,
-    role.title,
-    department.name AS 'department',
-    role.salary,
-    CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'manager'
-FROM
-    employee emp
-        JOIN
-    role ON role_id = role.id
-        JOIN
-    department ON role.department_id = department.id
-        LEFT JOIN
-    employee mgr ON emp.manager_id = mgr.id
-WHERE
-    department.name = ?
-ORDER BY emp.id;`,
+              emp.id,
+              emp.first_name,
+              emp.last_name,
+              role.title,
+              department.name AS 'department',
+              role.salary,
+              CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'manager'
+          FROM
+              employee emp
+                  JOIN
+              role ON role_id = role.id
+                  JOIN
+              department ON role.department_id = department.id
+                  LEFT JOIN
+              employee mgr ON emp.manager_id = mgr.id
+          WHERE
+              department.name = ?
+          ORDER BY emp.id;`,
           [answer.choice],
-          (err, res) => {
+          (err, employeeList) => {
             if (err) throw err;
-            console.table(res);
+            console.table(employeeList);
             start();
           }
         );
@@ -152,40 +155,40 @@ ORDER BY emp.id;`,
 
 // view employees by roles
 function viewEmployeesByRole() {
-  connection.query("SELECT * FROM role;", (err, res) => {
+  connection.query("SELECT * FROM role;", (err, roleList) => {
     if (err) throw err;
     inquirer
       .prompt({
         type: "list",
         message: "Which employee role would you like to view?",
-        choices: res.map((obj) => obj.title),
+        choices: roleList.map((obj) => obj.title),
         name: "choice",
       })
       .then((answer) => {
         connection.query(
           `SELECT 
-    emp.id,
-    emp.first_name,
-    emp.last_name,
-    role.title,
-    department.name AS 'department',
-    role.salary,
-    CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'manager'
-FROM
-    employee emp
-        JOIN
-    role ON role_id = role.id
-        JOIN
-    department ON role.department_id = department.id
-        LEFT JOIN
-    employee mgr ON emp.manager_id = mgr.id
-WHERE
-    role.title = ?
-ORDER BY emp.id;`,
+              emp.id,
+              emp.first_name,
+              emp.last_name,
+              role.title,
+              department.name AS 'department',
+              role.salary,
+              CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'manager'
+          FROM
+              employee emp
+                  JOIN
+              role ON role_id = role.id
+                  JOIN
+              department ON role.department_id = department.id
+                  LEFT JOIN
+              employee mgr ON emp.manager_id = mgr.id
+          WHERE
+              role.title = ?
+          ORDER BY emp.id;`,
           [answer.choice],
-          (err, res) => {
+          (err, employeeList) => {
             if (err) throw err;
-            console.table(res);
+            console.table(employeeList);
             start();
           }
         );
@@ -206,22 +209,22 @@ ORDER BY emp.id;`,
 function viewAllEmployees() {
   connection.query(
     `SELECT 
-    emp.id AS 'ID',
-    emp.first_name AS 'First Name',
-    emp.last_name AS 'Last Name',
-    role.title AS 'Title',
-    department.name as 'Department',
-    role.salary AS 'Salary',
-    CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
-FROM
-    employee emp
-        JOIN
-    role ON role_id = role.id
-        JOIN
-    department ON role.department_id = department.id
-        LEFT JOIN
-    employee mgr ON emp.manager_id = mgr.id
-ORDER BY emp.id;`,
+        emp.id AS 'ID',
+        emp.first_name AS 'First Name',
+        emp.last_name AS 'Last Name',
+        role.title AS 'Title',
+        department.name as 'Department',
+        role.salary AS 'Salary',
+        CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
+    FROM
+        employee emp
+            JOIN
+        role ON role_id = role.id
+            JOIN
+        department ON role.department_id = department.id
+            LEFT JOIN
+        employee mgr ON emp.manager_id = mgr.id
+    ORDER BY emp.id;`,
     (err, res) => {
       if (err) throw err;
       console.log();
@@ -265,24 +268,24 @@ function viewEmployeesByManager() {
             ].id;
           connection.query(
             `SELECT 
-    emp.id,
-    emp.first_name,
-    emp.last_name,
-    role.title,
-    department.name AS 'department',
-    role.salary,
-    CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'manager'
-FROM
-    employee emp
-        JOIN
-    role ON role_id = role.id
-        JOIN
-    department ON role.department_id = department.id
-        LEFT JOIN
-    employee mgr ON emp.manager_id = mgr.id
-WHERE
-    emp.manager_id = ?
-ORDER BY emp.id;`,
+                emp.id,
+                emp.first_name,
+                emp.last_name,
+                role.title,
+                department.name AS 'department',
+                role.salary,
+                CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'manager'
+            FROM
+                employee emp
+                    JOIN
+                role ON role_id = role.id
+                    JOIN
+                department ON role.department_id = department.id
+                    LEFT JOIN
+                employee mgr ON emp.manager_id = mgr.id
+            WHERE
+                emp.manager_id = ?
+            ORDER BY emp.id;`,
             [mgrId],
             (err, res) => {
               if (err) throw err;
