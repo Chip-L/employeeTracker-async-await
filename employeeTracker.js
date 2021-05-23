@@ -38,14 +38,17 @@ function start() {
         type: "list",
         message: "What would you like to do?",
         choices: [
+          new inquirer.Separator("-- VIEWS --"),
           "View All Employees",
           "View All Employees By Department",
           "View All Employees By Role",
           "View All Employees By Manager",
+          new inquirer.Separator("-- EMPLOYEE --"),
           "Add Employee",
           "Remove Employee",
           "Update Employee Role",
           "Update Employee Manager",
+          new inquirer.Separator("-- OTHER --"),
           "Exit program",
           new inquirer.Separator(),
         ],
@@ -64,6 +67,7 @@ function start() {
           viewEmployeesByRole();
           break;
         case "View All Employees By Manager":
+          viewEmployeesByManager();
           break;
         case "Add Employee":
           break;
@@ -233,6 +237,72 @@ ORDER BY emp.id;`,
 // update employee managers
 
 // view employee by manager
+function viewEmployeesByManager() {
+  connection.query(
+    `SELECT DISTINCT
+        mgr.id,
+        CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
+    FROM
+        employee emp
+            JOIN
+        employee mgr ON emp.manager_id = mgr.id
+    WHERE
+        emp.manager_id IS NOT NULL
+    ORDER BY mgr.first_name;`,
+    (err, mgrList) => {
+      if (err) throw err;
+      inquirer
+        .prompt({
+          type: "list",
+          message: "Which manager's employees would you like to view?",
+          choices: mgrList.map((obj) => obj.Manager),
+          name: "choice",
+        })
+        .then((answer) => {
+          const mgrId =
+            mgrList[
+              mgrList.findIndex((manager) => manager.Manager === answer.choice)
+            ].id;
+          connection.query(
+            `SELECT 
+    emp.id,
+    emp.first_name,
+    emp.last_name,
+    role.title,
+    department.name AS 'department',
+    role.salary,
+    CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'manager'
+FROM
+    employee emp
+        JOIN
+    role ON role_id = role.id
+        JOIN
+    department ON role.department_id = department.id
+        LEFT JOIN
+    employee mgr ON emp.manager_id = mgr.id
+WHERE
+    emp.manager_id = ?
+ORDER BY emp.id;`,
+            [mgrId],
+            (err, res) => {
+              if (err) throw err;
+              console.table(res);
+              start();
+            }
+          );
+        })
+        .catch((error) => {
+          if (error.isTtyError) {
+            throw new Error(
+              "Prompt couldn't be rendered in the current environment."
+            );
+          } else {
+            throw error;
+          }
+        });
+    }
+  );
+}
 
 // delete department
 
