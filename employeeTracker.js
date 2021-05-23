@@ -46,6 +46,7 @@ function start() {
           "Update Employee Role",
           "Update Employee Manager",
           "Exit program",
+          new inquirer.Separator(),
         ],
         name: "choice",
       },
@@ -56,6 +57,7 @@ function start() {
           viewAllEmployees();
           break;
         case "View All Employees By Department":
+          viewEmployeesByDepartment();
           break;
         case "View All Employees By Manager":
           break;
@@ -82,6 +84,67 @@ function start() {
     });
 }
 
+// add department
+
+// add roles
+
+// add employees
+
+// view employees by department
+function viewEmployeesByDepartment() {
+  connection.query("SELECT * FROM department;", (err, res) => {
+    if (err) throw err;
+    inquirer
+      .prompt({
+        type: "list",
+        message: "Which department would you like to view?",
+        choices: res,
+        name: "choice",
+      })
+      .then((answer) => {
+        connection.query(
+          `SELECT 
+    emp.id,
+    emp.first_name,
+    emp.last_name,
+    role.title,
+    department.name AS 'department',
+    role.salary,
+    CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'manager'
+FROM
+    employee emp
+        JOIN
+    role ON role_id = role.id
+        JOIN
+    department ON role.department_id = department.id
+        LEFT JOIN
+    employee mgr ON emp.manager_id = mgr.id
+WHERE
+    department.name = ?
+ORDER BY emp.id;`,
+          [answer.choice],
+          (err, res) => {
+            if (err) throw err;
+            console.table(res);
+            start();
+          }
+        );
+      })
+      .catch((error) => {
+        if (error.isTtyError) {
+          throw new Error(
+            "Prompt couldn't be rendered in the current environment."
+          );
+        } else {
+          throw error;
+        }
+      });
+  });
+}
+
+// view employees by roles
+
+// view all employees
 function viewAllEmployees() {
   connection.query(
     `SELECT 
@@ -109,18 +172,6 @@ ORDER BY emp.id;`,
     }
   );
 }
-
-// add department
-
-// add roles
-
-// add employees
-
-// view department
-
-// view roles
-
-// view employees
 
 // update employee roles
 
