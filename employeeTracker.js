@@ -1,6 +1,6 @@
 const inquirer = require("inquirer");
 const mysql = require("mysql");
-const consoleTable = require("console.table");
+const cTable = require("console.table");
 
 // create mysql connection
 const connection = mysql.createConnection({
@@ -40,6 +40,7 @@ function start() {
         choices: [
           "View All Employees",
           "View All Employees By Department",
+          "View All Employees By Role",
           "View All Employees By Manager",
           "Add Employee",
           "Remove Employee",
@@ -58,6 +59,9 @@ function start() {
           break;
         case "View All Employees By Department":
           viewEmployeesByDepartment();
+          break;
+        case "View All Employees By Role":
+          viewEmployeesByRole();
           break;
         case "View All Employees By Manager":
           break;
@@ -98,7 +102,7 @@ function viewEmployeesByDepartment() {
       .prompt({
         type: "list",
         message: "Which department would you like to view?",
-        choices: res,
+        choices: res.map((obj) => obj.name),
         name: "choice",
       })
       .then((answer) => {
@@ -143,6 +147,56 @@ ORDER BY emp.id;`,
 }
 
 // view employees by roles
+function viewEmployeesByRole() {
+  connection.query("SELECT * FROM role;", (err, res) => {
+    if (err) throw err;
+    inquirer
+      .prompt({
+        type: "list",
+        message: "Which employee role would you like to view?",
+        choices: res.map((obj) => obj.title),
+        name: "choice",
+      })
+      .then((answer) => {
+        connection.query(
+          `SELECT 
+    emp.id,
+    emp.first_name,
+    emp.last_name,
+    role.title,
+    department.name AS 'department',
+    role.salary,
+    CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'manager'
+FROM
+    employee emp
+        JOIN
+    role ON role_id = role.id
+        JOIN
+    department ON role.department_id = department.id
+        LEFT JOIN
+    employee mgr ON emp.manager_id = mgr.id
+WHERE
+    role.title = ?
+ORDER BY emp.id;`,
+          [answer.choice],
+          (err, res) => {
+            if (err) throw err;
+            console.table(res);
+            start();
+          }
+        );
+      })
+      .catch((error) => {
+        if (error.isTtyError) {
+          throw new Error(
+            "Prompt couldn't be rendered in the current environment."
+          );
+        } else {
+          throw error;
+        }
+      });
+  });
+}
 
 // view all employees
 function viewAllEmployees() {
