@@ -49,6 +49,7 @@ function start() {
           "Update Employee Role",
           "Remove Employee",
           new inquirer.Separator("-- OTHER --"),
+          "Add New Role",
           "Exit program",
           new inquirer.Separator(),
         ],
@@ -83,6 +84,9 @@ function start() {
         case "Remove Employee":
           break;
         // -- OTHER --
+        case "Add New Role":
+          addNewRole();
+          break;
         default:
           connection.end();
       }
@@ -398,7 +402,57 @@ function updateEmployeeRole() {
 }
 
 // add roles
+function addNewRole() {
+  // get departmentList
+  connection.query(`SELECT * FROM department`, (err, departmentList) => {
+    if (err) throw err;
 
+    // question the information
+    inquirer
+      .prompt([
+        {
+          type: "input",
+          message: "What is the title of the role?",
+          name: "title",
+        },
+        {
+          type: "input",
+          message: "What is the salary for this role?",
+          name: "salary",
+          validate: (salary) => !isNaN(salary),
+        },
+        {
+          type: "list",
+          message: "Which department does this role belong to?",
+          choices: departmentList.map((dept) => dept.name),
+          name: "dept",
+        },
+      ])
+      .then((answers) => {
+        console.table(departmentList);
+        const newRole = {
+          title: answers.title,
+          salary: answers.salary,
+          department_id:
+            departmentList[
+              departmentList.findIndex((dept) => dept.name === answers.dept)
+            ].id,
+        };
+
+        // add role to DB
+        connection.query(`INSERT INTO role SET ?`, newRole, (err, res) => {
+          if (err) throw err;
+
+          console.log(`${newRole.title} has been added as a role.`);
+
+          start();
+        });
+      })
+      .catch((err) => {
+        if (err) throw err;
+      });
+  });
+}
 // add department
 
 /**** bonus ****/
