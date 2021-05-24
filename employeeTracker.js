@@ -78,6 +78,7 @@ function start() {
           updateEmployeeManager();
           break;
         case "Update Employee Role":
+          updateEmployeeRole();
           break;
         case "Remove Employee":
           break;
@@ -328,6 +329,73 @@ function addEmployee() {
 }
 
 // update employee roles
+function updateEmployeeRole() {
+  // get employeeList
+  connection.query(
+    `SELECT id, CONCAT(first_name,' ', last_name) AS 'Employee'
+    FROM employee;`,
+    (err, employeeList) => {
+      if (err) throw err;
+      connection.query(
+        `SELECT id, title 
+        FROM role;`,
+        (err, roleList) => {
+          if (err) throw err;
+          inquirer
+            .prompt([
+              {
+                type: "list",
+                message: "Which employee would you like to change?",
+                choices: employeeList.map((emp) => emp.Employee),
+                name: "employee",
+              },
+              {
+                type: "list",
+                message: "What is the new role?",
+                choices: roleList.map((role) => role.title),
+                name: "role",
+              },
+            ])
+            .then((answers) => {
+              const empId = {
+                id: employeeList[
+                  employeeList.findIndex(
+                    (emp) => emp.Employee === answers.employee
+                  )
+                ].id,
+              };
+              const roleId = {
+                role_id:
+                  roleList[
+                    roleList.findIndex((role) => role.title === answers.role)
+                  ].id,
+              };
+
+              connection.query(
+                `UPDATE employee SET ? WHERE ?`,
+                [roleId, empId],
+                (err, res) => {
+                  if (err) throw err;
+
+                  console.log(
+                    `${answers.employee} has been updated to the new role ${answers.role}`
+                  );
+
+                  start();
+                }
+              );
+            })
+            .catch((err) => {
+              if (err) throw err;
+            });
+        }
+      );
+    }
+  );
+  // get roleList
+  // ask which employee and role to update
+  // update DB
+}
 
 // add roles
 
