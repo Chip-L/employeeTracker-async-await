@@ -95,6 +95,7 @@ function start() {
           addNewDepartment();
           break;
         case "Remove Role":
+          removeRole();
           break;
         case "Remove Department":
           break;
@@ -663,7 +664,7 @@ function removeEmployee() {
             (err, res) => {
               if (err) throw err;
 
-              console.log(`${answer.employee} has been deleted.`);
+              console.log(`${answer.employee} has been removed.`);
 
               start();
             }
@@ -677,7 +678,38 @@ function removeEmployee() {
 }
 
 // delete roles
+function removeRole() {
+  connection.query(`SELECT * FROM role;`, (err, roleList) => {
+    if (err) throw err;
 
+    inquirer
+      .prompt({
+        type: "list",
+        message: "Which role would you like to delete?",
+        choices: roleList.map((role) => role.title),
+        name: "role",
+      })
+      .then((answer) => {
+        const roleId =
+          roleList[roleList.findIndex((role) => role.title === answer.role)].id;
+
+        connection.query(
+          `DELETE FROM role WHERE id = ?`,
+          [roleId],
+          (err, res) => {
+            if (err) throw err;
+
+            console.log(`${answer.role} has been removed.`);
+
+            start();
+          }
+        );
+      })
+      .catch((err) => {
+        if (err) throw err;
+      });
+  });
+}
 // delete department
 
 // View the total utilized budget of a department -- ie the combined salaries of all employees in that department
