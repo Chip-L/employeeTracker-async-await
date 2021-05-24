@@ -98,8 +98,10 @@ function start() {
           removeRole();
           break;
         case "Remove Department":
+          removeDepartment();
           break;
         default:
+          // Exit
           connection.end();
       }
     })
@@ -678,6 +680,7 @@ function removeEmployee() {
 }
 
 // delete roles
+//TODO: add list of employees now stranded without roles or verify no Employees have role being deleted
 function removeRole() {
   connection.query(`SELECT * FROM role;`, (err, roleList) => {
     if (err) throw err;
@@ -710,7 +713,43 @@ function removeRole() {
       });
   });
 }
+
 // delete department
+//TODO: add list of employees and roles now stranded without department or verify no Employees/Roles have department being deleted
+function removeDepartment() {
+  connection.query(`SELECT * FROM department`, (err, departmentList) => {
+    if (err) throw err;
+
+    inquirer
+      .prompt({
+        type: "list",
+        message: "Which department would you like to remove?",
+        choices: departmentList.map((dept) => dept.name),
+        name: "dept",
+      })
+      .then((answer) => {
+        deptId =
+          departmentList[
+            departmentList.findIndex((dept) => dept.name === answer.dept)
+          ].id;
+
+        connection.query(
+          `DELETE FROM department WHERE id = ?`,
+          [deptId],
+          (err, res) => {
+            if (err) throw err;
+
+            console.log(`${answer.dept} has been removed.`);
+
+            start();
+          }
+        );
+      })
+      .catch((err) => {
+        if (err) throw err;
+      });
+  });
+}
 
 // View the total utilized budget of a department -- ie the combined salaries of all employees in that department
 
