@@ -51,6 +51,8 @@ function start() {
           new inquirer.Separator("-- OTHER --"),
           "Add New Role",
           "Add New Department",
+          "Remove Role",
+          "Remove Department",
           "Exit program",
           new inquirer.Separator(),
         ],
@@ -83,6 +85,7 @@ function start() {
           updateEmployeeRole();
           break;
         case "Remove Employee":
+          removeEmployee();
           break;
         // -- OTHER --
         case "Add New Role":
@@ -90,6 +93,10 @@ function start() {
           break;
         case "Add New Department":
           addNewDepartment();
+          break;
+        case "Remove Role":
+          break;
+        case "Remove Department":
           break;
         default:
           connection.end();
@@ -627,11 +634,51 @@ function updateEmployeeManager() {
   // update employee
 }
 
-// delete department
+// delete employees
+function removeEmployee() {
+  connection.query(
+    `SELECT id, CONCAT(first_name, " ",last_name) AS "Employee"
+    FROM employee;`,
+    (err, employeeList) => {
+      if (err) throw err;
+
+      inquirer
+        .prompt({
+          type: "list",
+          message: "Which employee would you like to remove? ",
+          choices: employeeList.map((emp) => emp.Employee),
+          name: "employee",
+        })
+        .then((answer) => {
+          if (err) throw err;
+
+          const empId =
+            employeeList[
+              employeeList.findIndex((emp) => emp.Employee === answer.employee)
+            ].id;
+
+          connection.query(
+            `DELETE FROM employee WHERE id = ?`,
+            [empId],
+            (err, res) => {
+              if (err) throw err;
+
+              console.log(`${answer.employee} has been deleted.`);
+
+              start();
+            }
+          );
+        })
+        .catch((err) => {
+          if (err) throw err;
+        });
+    }
+  );
+}
 
 // delete roles
 
-// delete employees
+// delete department
 
 // View the total utilized budget of a department -- ie the combined salaries of all employees in that department
 
