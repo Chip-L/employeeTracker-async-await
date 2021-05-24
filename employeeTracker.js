@@ -352,6 +352,10 @@ function viewEmployeesByManager() {
     ORDER BY mgr.first_name;`,
     (err, mgrList) => {
       if (err) throw err;
+
+      // add no choice for the manager to the list
+      mgrList.push({ id: null, Manager: "No direct manager" });
+
       inquirer
         .prompt({
           type: "list",
@@ -382,7 +386,7 @@ function viewEmployeesByManager() {
                     LEFT JOIN
                 employee mgr ON emp.manager_id = mgr.id
             WHERE
-                emp.manager_id = ?
+                emp.manager_id ${mgrId === null ? "IS NULL" : "= ?"}
             ORDER BY emp.id;`,
             [mgrId],
             (err, res) => {
