@@ -43,6 +43,7 @@ function start() {
           "View All Employees By Department",
           "View All Employees By Role",
           "View All Employees By Manager",
+          "View the Budget of a Department",
           new inquirer.Separator("-- EMPLOYEE --"),
           "Add Employee",
           "Update Employee Manager",
@@ -73,6 +74,9 @@ function start() {
           break;
         case "View All Employees By Manager":
           viewEmployeesByManager();
+          break;
+        case "View the Budget of a Department":
+          viewDepartmentBudget();
           break;
         // -- EMPLOYEE --
         case "Add Employee":
@@ -752,6 +756,52 @@ function removeDepartment() {
 }
 
 // View the total utilized budget of a department -- ie the combined salaries of all employees in that department
+function viewDepartmentBudget() {
+  connection.query(`SELECT * FROM department`, (err, departmentList) => {
+    if (err) throw err;
+
+    inquirer
+      .prompt({
+        type: "list",
+        message: "Which department's budget would you like to see?",
+        choices: departmentList.map((dept) => dept.name),
+        name: "dept",
+      })
+      .then((answer) => {
+        deptId =
+          departmentList[
+            departmentList.findIndex((dept) => dept.name === answer.dept)
+          ].id;
+
+        connection.query(
+          `SELECT 
+              SUM(salary) AS "Budget"
+          FROM
+              role
+                  JOIN
+              employee ON role.id = employee.role_id
+                  JOIN
+              department ON role.department_id = department.id 
+          WHERE
+              department_id = ?;`,
+          [deptId],
+          (err, budget) => {
+            if (err) throw err;
+
+            const budgetAmt = budget[0].Budget || 0;
+            console.log(`The budget for ${answer.dept} is $${budgetAmt}.`);
+
+            start();
+          }
+        );
+
+        console.log();
+      })
+      .catch((err) => {
+        if (err) throw err;
+      });
+  });
+}
 
 // make db connection
 connection.connect((err) => {
