@@ -75,6 +75,7 @@ function start() {
           addEmployee();
           break;
         case "Update Employee Manager":
+          updateEmployeeManager();
           break;
         case "Update Employee Role":
           break;
@@ -231,18 +232,14 @@ function viewEmployeesByRole() {
 
 // add employees
 function addEmployee() {
-  // get list of managers
+  // get manager list (Any employee can be a manager)
   connection.query(
-    `SELECT DISTINCT
-        mgr.id,
-        CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
+    `SELECT 
+        id,
+        CONCAT(first_name, ' ', last_name) AS 'Manager'
     FROM
-        employee emp
-            JOIN
-        employee mgr ON emp.manager_id = mgr.id
-    WHERE
-        emp.manager_id IS NOT NULL
-    ORDER BY mgr.first_name;`,
+        employee
+    ORDER BY id;`,
     (err, mgrList) => {
       if (err) throw err;
 
@@ -339,6 +336,7 @@ function addEmployee() {
 /**** bonus ****/
 // view employee by manager
 function viewEmployeesByManager() {
+  // limit list of managers to employees that ARE managers
   connection.query(
     `SELECT DISTINCT
         mgr.id,
@@ -410,6 +408,74 @@ function viewEmployeesByManager() {
 }
 
 // update employee managers
+function updateEmployeeManager() {
+  // get employee to change
+  connection.query(
+    `SELECT id, CONCAT(first_name, ' ', last_name) AS "Employee"
+    FROM employee`,
+    (err, employeeList) => {
+      if (err) throw err;
+      // get manager list (Any employee can be a manager) and add no choice for the manager
+      const mgrList = [
+        ...employeeList,
+        { id: null, Employee: "No direct manager" },
+      ];
+
+      // get new information
+      inquirer
+        .prompt([
+          {
+            type: "list",
+            message: "Which employee would you like to change?",
+            choices: employeeList.map((employee) => employee.Employee),
+            name: "employee",
+          },
+          {
+            type: "list",
+            message: "Who is the new manager?",
+            choices: mgrList.map((manager) => manager.Employee),
+            name: "manager",
+          },
+        ])
+        .then((answers) => {
+          const empId = {
+            id: employeeList[
+              employeeList.findIndex(
+                (employee) => employee.Employee === answers.employee
+              )
+            ].id,
+          };
+          const mgrId = {
+            manager_id:
+              mgrList[
+                mgrList.findIndex(
+                  (manager) => manager.Employee === answers.manager
+                )
+              ].id,
+          };
+
+          // console.log("empId:", empId, "\nmgrId:", mgrId);
+          connection.query(
+            `UPDATE employee SET ? WHERE ?`,
+            [mgrId, empId],
+            (err, res) => {
+              if (err) throw err;
+
+              console.log(
+                `${answers.employee} has been updated to have ${answers.manager} as their manager.`
+              );
+
+              start();
+            }
+          );
+        })
+        .catch((err) => {
+          if (err) throw err;
+        });
+    }
+  );
+  // update employee
+}
 
 // delete department
 
