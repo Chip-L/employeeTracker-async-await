@@ -50,6 +50,7 @@ function start() {
           "Remove Employee",
           new inquirer.Separator("-- OTHER --"),
           "Add New Role",
+          "Add New Department",
           "Exit program",
           new inquirer.Separator(),
         ],
@@ -86,6 +87,9 @@ function start() {
         // -- OTHER --
         case "Add New Role":
           addNewRole();
+          break;
+        case "Add New Department":
+          addNewDepartment();
           break;
         default:
           connection.end();
@@ -453,7 +457,31 @@ function addNewRole() {
       });
   });
 }
+
 // add department
+function addNewDepartment() {
+  inquirer
+    .prompt({
+      type: "input",
+      message: "What is the name of the new department?",
+      name: "name",
+    })
+    .then((answer) => {
+      console.log(answer);
+      connection.query(`INSERT INTO department SET ?`, answer, (err, res) => {
+        if (err) throw err;
+
+        console.log(
+          `${answer.name} has been updated.\n\nBe sure to add the roles for this department!\n`
+        );
+
+        start();
+      });
+    })
+    .catch((err) => {
+      if (err) throw err;
+    });
+}
 
 /**** bonus ****/
 // view employee by manager
