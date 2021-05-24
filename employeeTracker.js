@@ -31,7 +31,7 @@ const showStartScreen = () => {
 };
 
 // get options
-function start() {
+function menu() {
   inquirer
     .prompt([
       {
@@ -131,20 +131,16 @@ function viewAllEmployees() {
         department.name as 'Department',
         role.salary AS 'Salary',
         CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
-    FROM
-        employee emp
-            JOIN
-        role ON role_id = role.id
-            JOIN
-        department ON role.department_id = department.id
-            LEFT JOIN
-        employee mgr ON emp.manager_id = mgr.id
+    FROM employee emp
+      JOIN role ON role_id = role.id
+      JOIN department ON role.department_id = department.id
+      LEFT JOIN employee mgr ON emp.manager_id = mgr.id
     ORDER BY emp.id;`,
     (err, res) => {
       if (err) throw err;
       console.log();
       console.table(res);
-      start();
+      menu();
     }
   );
 }
@@ -163,29 +159,24 @@ function viewEmployeesByDepartment() {
       .then((answer) => {
         connection.query(
           `SELECT 
-              emp.id,
-              emp.first_name,
-              emp.last_name,
-              role.title,
-              department.name AS 'department',
-              role.salary,
-              CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'manager'
-          FROM
-              employee emp
-                  JOIN
-              role ON role_id = role.id
-                  JOIN
-              department ON role.department_id = department.id
-                  LEFT JOIN
-              employee mgr ON emp.manager_id = mgr.id
-          WHERE
-              department.name = ?
+              emp.id AS 'ID',
+              emp.first_name AS 'First Name',
+              emp.last_name AS 'Last Name',
+              role.title AS 'Role',
+              department.name AS 'Department',
+              role.salary AS 'Salary',
+              CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
+          FROM employee emp
+              JOIN role ON role_id = role.id
+              JOIN department ON role.department_id = department.id
+              LEFT JOIN employee mgr ON emp.manager_id = mgr.id
+          WHERE department.name = ?
           ORDER BY emp.id;`,
           [answer.choice],
           (err, employeeList) => {
             if (err) throw err;
             console.table(employeeList);
-            start();
+            menu();
           }
         );
       })
@@ -215,29 +206,24 @@ function viewEmployeesByRole() {
       .then((answer) => {
         connection.query(
           `SELECT 
-              emp.id,
-              emp.first_name,
-              emp.last_name,
-              role.title,
-              department.name AS 'department',
-              role.salary,
-              CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'manager'
-          FROM
-              employee emp
-                  JOIN
-              role ON role_id = role.id
-                  JOIN
-              department ON role.department_id = department.id
-                  LEFT JOIN
-              employee mgr ON emp.manager_id = mgr.id
-          WHERE
-              role.title = ?
+              emp.id AS 'ID',
+              emp.first_name AS 'First Name',
+              emp.last_name AS 'Last Name',
+              role.title AS 'Role',
+              department.name AS 'Department',
+              role.salary AS 'Salary',
+              CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
+          FROM employee emp
+              JOIN role ON role_id = role.id
+              JOIN department ON role.department_id = department.id
+              LEFT JOIN employee mgr ON emp.manager_id = mgr.id
+          WHERE role.title = ?
           ORDER BY emp.id;`,
           [answer.choice],
           (err, employeeList) => {
             if (err) throw err;
             console.table(employeeList);
-            start();
+            menu();
           }
         );
       })
@@ -260,8 +246,7 @@ function addEmployee() {
     `SELECT 
         id,
         CONCAT(first_name, ' ', last_name) AS 'Manager'
-    FROM
-        employee
+    FROM employee
     ORDER BY id;`,
     (err, mgrList) => {
       if (err) throw err;
@@ -335,15 +320,20 @@ function addEmployee() {
                   } and a salary of $${roleList[newEmployee.role_id].salary}`
                 );
 
-                start();
+                menu();
               }
             );
 
             // add employee to DB
           })
-          .catch((err) => {
-            console.log("catch inquirer");
-            throw err;
+          .catch((error) => {
+            if (error.isTtyError) {
+              throw new Error(
+                "Prompt couldn't be rendered in the current environment."
+              );
+            } else {
+              throw error;
+            }
           });
       });
     }
@@ -403,12 +393,18 @@ function updateEmployeeRole() {
                     `${answers.employee} has been updated to the new role ${answers.role}`
                   );
 
-                  start();
+                  menu();
                 }
               );
             })
-            .catch((err) => {
-              if (err) throw err;
+            .catch((error) => {
+              if (error.isTtyError) {
+                throw new Error(
+                  "Prompt couldn't be rendered in the current environment."
+                );
+              } else {
+                throw error;
+              }
             });
         }
       );
@@ -463,11 +459,17 @@ function addNewRole() {
 
           console.log(`${newRole.title} has been added as a role.`);
 
-          start();
+          menu();
         });
       })
-      .catch((err) => {
-        if (err) throw err;
+      .catch((error) => {
+        if (error.isTtyError) {
+          throw new Error(
+            "Prompt couldn't be rendered in the current environment."
+          );
+        } else {
+          throw error;
+        }
       });
   });
 }
@@ -489,11 +491,17 @@ function addNewDepartment() {
           `${answer.name} has been updated.\n\nBe sure to add the roles for this department!\n`
         );
 
-        start();
+        menu();
       });
     })
-    .catch((err) => {
-      if (err) throw err;
+    .catch((error) => {
+      if (error.isTtyError) {
+        throw new Error(
+          "Prompt couldn't be rendered in the current environment."
+        );
+      } else {
+        throw error;
+      }
     });
 }
 
@@ -505,12 +513,9 @@ function viewEmployeesByManager() {
     `SELECT DISTINCT
         mgr.id,
         CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
-    FROM
-        employee emp
-            JOIN
-        employee mgr ON emp.manager_id = mgr.id
-    WHERE
-        emp.manager_id IS NOT NULL
+    FROM employee emp
+        JOIN employee mgr ON emp.manager_id = mgr.id
+    WHERE emp.manager_id IS NOT NULL
     ORDER BY mgr.first_name;`,
     (err, mgrList) => {
       if (err) throw err;
@@ -532,29 +537,24 @@ function viewEmployeesByManager() {
             ].id;
           connection.query(
             `SELECT 
-                emp.id,
-                emp.first_name,
-                emp.last_name,
-                role.title,
-                department.name AS 'department',
-                role.salary,
-                CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'manager'
-            FROM
-                employee emp
-                    JOIN
-                role ON role_id = role.id
-                    JOIN
-                department ON role.department_id = department.id
-                    LEFT JOIN
-                employee mgr ON emp.manager_id = mgr.id
-            WHERE
-                emp.manager_id ${mgrId === null ? "IS NULL" : "= ?"}
+                emp.id AS 'ID',
+                emp.first_name AS 'First Name',
+                emp.last_name AS 'Last Name',
+                role.title AS 'Role',
+                department.name AS 'Department',
+                role.salary AS 'Salary',
+                CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
+            FROM employee emp
+                JOIN role ON role_id = role.id
+                JOIN department ON role.department_id = department.id
+                LEFT JOIN employee mgr ON emp.manager_id = mgr.id
+            WHERE emp.manager_id ${mgrId === null ? "IS NULL" : "= ?"}
             ORDER BY emp.id;`,
             [mgrId],
             (err, res) => {
               if (err) throw err;
               console.table(res);
-              start();
+              menu();
             }
           );
         })
@@ -575,7 +575,7 @@ function viewEmployeesByManager() {
 function updateEmployeeManager() {
   // get employee to change
   connection.query(
-    `SELECT id, CONCAT(first_name, ' ', last_name) AS "Employee"
+    `SELECT id, CONCAT(first_name, ' ', last_name) AS 'Employee'
     FROM employee`,
     (err, employeeList) => {
       if (err) throw err;
@@ -629,12 +629,18 @@ function updateEmployeeManager() {
                 `${answers.employee} has been updated to have ${answers.manager} as their manager.`
               );
 
-              start();
+              menu();
             }
           );
         })
-        .catch((err) => {
-          if (err) throw err;
+        .catch((error) => {
+          if (error.isTtyError) {
+            throw new Error(
+              "Prompt couldn't be rendered in the current environment."
+            );
+          } else {
+            throw error;
+          }
         });
     }
   );
@@ -644,7 +650,7 @@ function updateEmployeeManager() {
 // delete employees
 function removeEmployee() {
   connection.query(
-    `SELECT id, CONCAT(first_name, " ",last_name) AS "Employee"
+    `SELECT id, CONCAT(first_name, " ",last_name) AS 'Employee'
     FROM employee;`,
     (err, employeeList) => {
       if (err) throw err;
@@ -672,12 +678,18 @@ function removeEmployee() {
 
               console.log(`${answer.employee} has been removed.`);
 
-              start();
+              menu();
             }
           );
         })
-        .catch((err) => {
-          if (err) throw err;
+        .catch((error) => {
+          if (error.isTtyError) {
+            throw new Error(
+              "Prompt couldn't be rendered in the current environment."
+            );
+          } else {
+            throw error;
+          }
         });
     }
   );
@@ -708,12 +720,18 @@ function removeRole() {
 
             console.log(`${answer.role} has been removed.`);
 
-            start();
+            menu();
           }
         );
       })
-      .catch((err) => {
-        if (err) throw err;
+      .catch((error) => {
+        if (error.isTtyError) {
+          throw new Error(
+            "Prompt couldn't be rendered in the current environment."
+          );
+        } else {
+          throw error;
+        }
       });
   });
 }
@@ -745,12 +763,18 @@ function removeDepartment() {
 
             console.log(`${answer.dept} has been removed.`);
 
-            start();
+            menu();
           }
         );
       })
-      .catch((err) => {
-        if (err) throw err;
+      .catch((error) => {
+        if (error.isTtyError) {
+          throw new Error(
+            "Prompt couldn't be rendered in the current environment."
+          );
+        } else {
+          throw error;
+        }
       });
   });
 }
@@ -774,16 +798,11 @@ function viewDepartmentBudget() {
           ].id;
 
         connection.query(
-          `SELECT 
-              SUM(salary) AS "Budget"
-          FROM
-              role
-                  JOIN
-              employee ON role.id = employee.role_id
-                  JOIN
-              department ON role.department_id = department.id 
-          WHERE
-              department_id = ?;`,
+          `SELECT SUM(salary) AS 'Budget'
+          FROM role
+              JOIN employee ON role.id = employee.role_id
+              JOIN department ON role.department_id = department.id 
+          WHERE department_id = ?;`,
           [deptId],
           (err, budget) => {
             if (err) throw err;
@@ -791,14 +810,20 @@ function viewDepartmentBudget() {
             const budgetAmt = budget[0].Budget || 0;
             console.log(`The budget for ${answer.dept} is $${budgetAmt}.`);
 
-            start();
+            menu();
           }
         );
 
         console.log();
       })
-      .catch((err) => {
-        if (err) throw err;
+      .catch((error) => {
+        if (error.isTtyError) {
+          throw new Error(
+            "Prompt couldn't be rendered in the current environment."
+          );
+        } else {
+          throw error;
+        }
       });
   });
 }
@@ -809,5 +834,5 @@ connection.connect((err) => {
   console.log(`connected as is ${connection.threadId}\n`);
 
   showStartScreen();
-  start();
+  menu();
 });
