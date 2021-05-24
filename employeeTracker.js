@@ -72,6 +72,7 @@ function start() {
           break;
         // -- EMPLOYEE --
         case "Add Employee":
+          addEmployee();
           break;
         case "Update Employee Manager":
           break;
@@ -95,11 +96,34 @@ function start() {
     });
 }
 
-// add department
-
-// add roles
-
-// add employees
+// view all employees
+function viewAllEmployees() {
+  connection.query(
+    `SELECT 
+        emp.id AS 'ID',
+        emp.first_name AS 'First Name',
+        emp.last_name AS 'Last Name',
+        role.title AS 'Title',
+        department.name as 'Department',
+        role.salary AS 'Salary',
+        CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
+    FROM
+        employee emp
+            JOIN
+        role ON role_id = role.id
+            JOIN
+        department ON role.department_id = department.id
+            LEFT JOIN
+        employee mgr ON emp.manager_id = mgr.id
+    ORDER BY emp.id;`,
+    (err, res) => {
+      if (err) throw err;
+      console.log();
+      console.table(res);
+      start();
+    }
+  );
+}
 
 // view employees by department
 function viewEmployeesByDepartment() {
@@ -205,40 +229,114 @@ function viewEmployeesByRole() {
   });
 }
 
-// view all employees
-function viewAllEmployees() {
+// add employees
+function addEmployee() {
+  // get list of managers
   connection.query(
-    `SELECT 
-        emp.id AS 'ID',
-        emp.first_name AS 'First Name',
-        emp.last_name AS 'Last Name',
-        role.title AS 'Title',
-        department.name as 'Department',
-        role.salary AS 'Salary',
+    `SELECT DISTINCT
+        mgr.id,
         CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
     FROM
         employee emp
             JOIN
-        role ON role_id = role.id
-            JOIN
-        department ON role.department_id = department.id
-            LEFT JOIN
         employee mgr ON emp.manager_id = mgr.id
-    ORDER BY emp.id;`,
-    (err, res) => {
+    WHERE
+        emp.manager_id IS NOT NULL
+    ORDER BY mgr.first_name;`,
+    (err, mgrList) => {
       if (err) throw err;
-      console.log();
-      console.table(res);
-      start();
+
+      // add no choice for the manager to the list
+      mgrList.push({ id: null, Manager: "No direct manager" });
+
+      // get list of roles
+      connection.query("SELECT * FROM role;", (err, roleList) => {
+        if (err) throw err;
+
+        // get employee information (first name, last name, manager, role (department is not needed as it is tied to role))
+        inquirer
+          .prompt([
+            {
+              type: "input",
+              message: "Employee's first name: ",
+              name: "firstName",
+              validate: (firstName) =>
+                /^[a-zA-Z]+( [a-zA-Z]*)*$/.test(firstName),
+            },
+            {
+              type: "input",
+              message: "Employee's last name: ",
+              name: "lastName",
+              validate: (lastName) => /^[a-zA-Z]+( [a-zA-Z]*)*$/.test(lastName),
+            },
+            {
+              type: "list",
+              message: "What is the employee's role? ",
+              choices: roleList.map((role) => role.title),
+              name: "role",
+            },
+            {
+              type: "list",
+              message: "Who is the direct manager? ",
+              choices: mgrList.map((manager) => manager.Manager),
+              name: "manager",
+            },
+          ])
+          .then((answer) => {
+            console.log(answer);
+
+            const newEmployee = {
+              first_name: answer.firstName,
+              last_name: answer.lastName,
+              role_id:
+                roleList[
+                  roleList.findIndex((role) => role.title === answer.role)
+                ].id,
+              manager_id:
+                mgrList[
+                  mgrList.findIndex((mgr) => mgr.Manager === answer.manager)
+                ].id,
+            };
+
+            console.log(Object.values(newEmployee));
+
+            connection.query(
+              `INSERT INTO employee(first_name, last_name, role_id, manager_id)
+              VALUES (?,?,?,?)`,
+              Object.values(newEmployee),
+              (err, results) => {
+                if (err) throw err;
+
+                console.log(
+                  `${newEmployee.first_name} ${
+                    newEmployee.last_name
+                  } has been created with Employee ID: ${
+                    results.insertId
+                  } and a salary of $${roleList[newEmployee.role_id].salary}`
+                );
+
+                start();
+              }
+            );
+
+            // add employee to DB
+          })
+          .catch((err) => {
+            console.log("catch inquirer");
+            throw err;
+          });
+      });
     }
   );
 }
 
 // update employee roles
 
-/**** bonus ****/
-// update employee managers
+// add roles
 
+// add department
+
+/**** bonus ****/
 // view employee by manager
 function viewEmployeesByManager() {
   connection.query(
@@ -306,6 +404,8 @@ function viewEmployeesByManager() {
     }
   );
 }
+
+// update employee managers
 
 // delete department
 
