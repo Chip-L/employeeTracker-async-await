@@ -297,56 +297,49 @@ async function updateEmployeeRole() {
 }
 
 // add roles
-function addNewRole() {
-  let departmentList;
-  // get departmentList
-  sql
-    .getDepartmentList()
-    .then((deptList) => {
-      departmentList = deptList;
-      // question the information
-      return inquirer.prompt([
-        {
-          type: "input",
-          message: "What is the title of the role?",
-          name: "title",
-        },
-        {
-          type: "input",
-          message: "What is the salary for this role?",
-          name: "salary",
-          validate: (salary) => !isNaN(salary),
-        },
-        {
-          type: "list",
-          message: "Which department does this role belong to?",
-          choices: departmentList.map((dept) => dept.name),
-          name: "dept",
-        },
-      ]);
-    })
-    .then((answers) => {
-      const newRole = {
-        title: answers.title,
-        salary: answers.salary,
-        department_id:
-          departmentList[
-            departmentList.findIndex((dept) => dept.name === answers.dept)
-          ].id,
-      };
+async function addNewRole() {
+  try {
+    // get departmentList
+    const departmentList = await sql.getDepartmentList();
+    const answer = await inquirer.prompt([
+      {
+        type: "input",
+        message: "What is the title of the role?",
+        name: "title",
+      },
+      {
+        type: "input",
+        message: "What is the salary for this role?",
+        name: "salary",
+        validate: (salary) => !isNaN(salary),
+      },
+      {
+        type: "list",
+        message: "Which department does this role belong to?",
+        choices: departmentList.map((dept) => dept.name),
+        name: "dept",
+      },
+    ]);
 
-      // add role to DB
-      return sql.addNewRole(newRole).then(() => newRole);
-    })
-    .then((newRole) => {
-      console.log();
-      console.log(`${newRole.title} has been added as a role.`);
+    const newRole = {
+      title: answer.title,
+      salary: answer.salary,
+      department_id:
+        departmentList[
+          departmentList.findIndex((dept) => dept.name === answer.dept)
+        ].id,
+    };
 
-      menu();
-    })
-    .catch((error) => {
-      inquirerErr(error);
-    });
+    // add role to DB
+    await sql.addNewRole(newRole);
+
+    console.log();
+    console.log(`${newRole.title} has been added as a role.`);
+
+    menu();
+  } catch (error) {
+    inquirerErr(error);
+  }
 }
 
 // add department
