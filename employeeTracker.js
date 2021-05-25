@@ -24,7 +24,7 @@ connection.connect((err) => {
 /***  queries as promise objects ***/
 
 // returns promise of all employees -- where and matches are optional for filtering (where is the WHERE clause and matches are the objects in an array to be matched)
-const getAllEmployees = (where, matches) => {
+const getAllEmployeesDataSQL = (where, matches) => {
   return new Promise((resolve, reject) => {
     const query = `SELECT 
         emp.id AS 'ID',
@@ -47,7 +47,7 @@ const getAllEmployees = (where, matches) => {
   });
 };
 
-const getDepartmentList = new Promise((resolve, reject) => {
+const getDepartmentListSQL = new Promise((resolve, reject) => {
   const query = "SELECT * FROM department;";
   connection.query(query, (err, deptList) => {
     if (err) reject(err);
@@ -55,14 +55,26 @@ const getDepartmentList = new Promise((resolve, reject) => {
   });
 });
 
-const getRoleList = new Promise((resolve, reject) => {
+const getRoleListSQL = new Promise((resolve, reject) => {
   connection.query("SELECT * FROM role;", (err, roleList) => {
     if (err) reject(err);
     resolve(roleList);
   });
 });
 
-const getAllEmployeesAsManager = new Promise((resolve, reject) => {
+// returns a list of employees with the Employee column
+const getEmployeesAsEmployeeSQL = new Promise((resolve, reject) => {
+  const query = `SELECT id, CONCAT(first_name,' ', last_name) AS 'Employee'
+    FROM employee;`;
+
+  connection.query(query, (err, employeeList) => {
+    if (err) reject(err);
+    resolve(employeeList);
+  });
+});
+
+// returns a list of employees with the manager column
+const getAllEmployeesAsManagerSQL = new Promise((resolve, reject) => {
   const query = `SELECT 
         id,
         CONCAT(first_name, ' ', last_name) AS 'Manager'
@@ -78,7 +90,7 @@ const getAllEmployeesAsManager = new Promise((resolve, reject) => {
   });
 });
 
-const setNewEmployee = (newEmployee) => {
+const addNewEmployeeSQL = (newEmployee) => {
   return new Promise((resolve, reject) => {
     const query = `INSERT INTO employee(first_name, last_name, role_id, manager_id) VALUES (?,?,?,?)`;
 
@@ -86,6 +98,15 @@ const setNewEmployee = (newEmployee) => {
       if (err) reject(err);
       // console.log("in promise: ", results);
       resolve({ results: results, newEmployee: newEmployee });
+    });
+  });
+};
+
+const updateEmployeeSQL = (newValues) => {
+  return new Promise((resolve, reject) => {
+    connection.query(`UPDATE employee SET ? WHERE ?`, newValues, (err, res) => {
+      if (err) reject(err);
+      resolve(res);
     });
   });
 };
@@ -205,7 +226,7 @@ function menu() {
 
 // view all employees
 function viewAllEmployees() {
-  getAllEmployees().then((res) => {
+  getAllEmployeesDataSQL().then((res) => {
     console.log();
     console.table(res);
     menu();
@@ -214,7 +235,7 @@ function viewAllEmployees() {
 
 // view employees by department
 function viewEmployeesByDepartment() {
-  getDepartmentList
+  getDepartmentListSQL
     .then((deptList) =>
       inquirer.prompt({
         type: "list",
@@ -223,7 +244,9 @@ function viewEmployeesByDepartment() {
         name: "choice",
       })
     )
-    .then((answer) => getAllEmployees("WHERE ?", [{ name: answer.choice }]))
+    .then((answer) =>
+      getAllEmployeesDataSQL("WHERE ?", [{ name: answer.choice }])
+    )
     .then((res) => {
       console.log();
       console.table(res);
@@ -236,7 +259,7 @@ function viewEmployeesByDepartment() {
 
 // view employees by roles
 function viewEmployeesByRole() {
-  getRoleList
+  getRoleListSQL
     .then((roleList) =>
       inquirer.prompt({
         type: "list",
@@ -245,7 +268,9 @@ function viewEmployeesByRole() {
         name: "choice",
       })
     )
-    .then((answer) => getAllEmployees("WHERE ?", [{ title: answer.choice }]))
+    .then((answer) =>
+      getAllEmployeesDataSQL("WHERE ?", [{ title: answer.choice }])
+    )
     .then((employeeList) => {
       console.log();
       console.table(employeeList);
@@ -263,7 +288,7 @@ function addEmployee() {
 
   // get manager list (Any employee can be a manager)
   // get roleList -- these are done in parallel
-  Promise.all([getAllEmployeesAsManager, getRoleList])
+  Promise.all([getAllEmployeesAsManagerSQL, getRoleListSQL])
     .then((lists) => {
       mgrList = lists[0];
       roleList = lists[1];
@@ -309,7 +334,7 @@ function addEmployee() {
       return newEmployee;
     })
     // add employee to DB
-    .then((newEmployee) => setNewEmployee(newEmployee))
+    .then((newEmployee) => addNewEmployeeSQL(newEmployee))
     .then(({ results, newEmployee }) => {
       console.log();
       console.log(
@@ -329,68 +354,52 @@ function addEmployee() {
 
 // update employee roles
 function updateEmployeeRole() {
+  let employeeList, roleList;
+
   // get employeeList
-  connection.query(
-    `SELECT id, CONCAT(first_name,' ', last_name) AS 'Employee'
-    FROM employee;`,
-    (err, employeeList) => {
-      if (err) throw err;
-      connection.query(
-        `SELECT id, title 
-        FROM role;`,
-        (err, roleList) => {
-          if (err) throw err;
-          inquirer
-            .prompt([
-              {
-                type: "list",
-                message: "Which employee would you like to change?",
-                choices: employeeList.map((emp) => emp.Employee),
-                name: "employee",
-              },
-              {
-                type: "list",
-                message: "What is the new role?",
-                choices: roleList.map((role) => role.title),
-                name: "role",
-              },
-            ])
-            .then((answers) => {
-              const empId = {
-                id: employeeList[
-                  employeeList.findIndex(
-                    (emp) => emp.Employee === answers.employee
-                  )
-                ].id,
-              };
-              const roleId = {
-                role_id:
-                  roleList[
-                    roleList.findIndex((role) => role.title === answers.role)
-                  ].id,
-              };
+  Promise.all([getEmployeesAsEmployeeSQL, getRoleListSQL])
+    .then((lists) => {
+      employeeList = lists[0];
+      roleList = lists[1];
 
-              connection.query(
-                `UPDATE employee SET ? WHERE ?`,
-                [roleId, empId],
-                (err, res) => {
-                  if (err) throw err;
-
-                  console.log(
-                    `${answers.employee} has been updated to the new role ${answers.role}`
-                  );
-
-                  menu();
-                }
-              );
-            })
-            .catch((error) => {
-              inquirerErr(error);
-            });
-        }
+      return inquirer.prompt([
+        {
+          type: "list",
+          message: "Which employee would you like to change?",
+          choices: employeeList.map((emp) => emp.Employee),
+          name: "employee",
+        },
+        {
+          type: "list",
+          message: "What is the new role?",
+          choices: roleList.map((role) => role.title),
+          name: "role",
+        },
+      ]);
+    })
+    .then((answers) => {
+      const empId = {
+        id: employeeList[
+          employeeList.findIndex((emp) => emp.Employee === answers.employee)
+        ].id,
+      };
+      const roleId = {
+        role_id:
+          roleList[roleList.findIndex((role) => role.title === answers.role)]
+            .id,
+      };
+      return updateEmployeeSQL([roleId, empId]).then(() => answers);
+    })
+    .then((answers) => {
+      console.log();
+      console.log(
+        `${answers.employee} has been updated to the new role ${answers.role}`
       );
-    }
-  );
+      menu();
+    })
+    .catch((error) => {
+      inquirerErr(error);
+    });
 }
 
 // add roles
