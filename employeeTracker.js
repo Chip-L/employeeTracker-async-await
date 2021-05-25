@@ -24,8 +24,8 @@ connection.connect((err) => {
 /***  queries as promise objects ***/
 
 // returns promise of all employees -- where and matches are optional for filtering (where is the WHERE clause and matches are the objects in an array to be matched)
-const getAllEmployeesDataSQL = (where, matches) => {
-  return new Promise((resolve, reject) => {
+const getAllEmployeesDataSQL = (where, matches) =>
+  new Promise((resolve, reject) => {
     const query = `SELECT 
         emp.id AS 'ID',
         emp.first_name AS 'First Name',
@@ -40,58 +40,82 @@ const getAllEmployeesDataSQL = (where, matches) => {
       LEFT JOIN employee mgr ON emp.manager_id = mgr.id
     ${!where ? "" : where}
     ORDER BY emp.id;`;
+
     connection.query(query, matches, (err, res) => {
       if (err) reject(err);
       resolve(res);
     });
   });
-};
 
-const getDepartmentListSQL = new Promise((resolve, reject) => {
-  const query = "SELECT * FROM department;";
-  connection.query(query, (err, deptList) => {
-    if (err) reject(err);
-    resolve(deptList);
+const getDepartmentListSQL = () =>
+  new Promise((resolve, reject) => {
+    const query = "SELECT * FROM department;";
+    connection.query(query, (err, deptList) => {
+      if (err) reject(err);
+      resolve(deptList);
+    });
   });
-});
 
-const getRoleListSQL = new Promise((resolve, reject) => {
-  connection.query("SELECT * FROM role;", (err, roleList) => {
-    if (err) reject(err);
-    resolve(roleList);
+const getRoleListSQL = () =>
+  new Promise((resolve, reject) => {
+    connection.query("SELECT * FROM role;", (err, roleList) => {
+      if (err) reject(err);
+      resolve(roleList);
+    });
   });
-});
 
 // returns a list of employees with the Employee column
-const getEmployeesAsEmployeeSQL = new Promise((resolve, reject) => {
-  const query = `SELECT id, CONCAT(first_name,' ', last_name) AS 'Employee'
+const getEmployeesAsEmployeeSQL = () =>
+  new Promise((resolve, reject) => {
+    const query = `SELECT id, CONCAT(first_name,' ', last_name) AS 'Employee'
     FROM employee;`;
 
-  connection.query(query, (err, employeeList) => {
-    if (err) reject(err);
-    resolve(employeeList);
+    connection.query(query, (err, employeeList) => {
+      if (err) reject(err);
+      resolve(employeeList);
+    });
   });
-});
 
 // returns a list of employees with the manager column
-const getAllEmployeesAsManagerSQL = new Promise((resolve, reject) => {
-  const query = `SELECT 
+const getAllEmployeesAsManagerSQL = () =>
+  new Promise((resolve, reject) => {
+    const query = `SELECT 
         id,
         CONCAT(first_name, ' ', last_name) AS 'Manager'
     FROM employee
     ORDER BY id;`;
 
-  connection.query(query, (err, mgrList) => {
-    if (err) reject(err);
+    connection.query(query, (err, mgrList) => {
+      if (err) reject(err);
 
-    // add no choice for the manager to the list
-    mgrList.push({ id: null, Manager: "No direct manager" });
-    resolve(mgrList);
+      // add no choice for the manager to the list
+      mgrList.push({ id: null, Manager: "No direct manager" });
+      resolve(mgrList);
+    });
   });
-});
 
-const addNewEmployeeSQL = (newEmployee) => {
-  return new Promise((resolve, reject) => {
+// limit list of managers to employees that ARE managers
+const getOnlyManagersAsManagerSQL = () =>
+  new Promise((resolve, reject) => {
+    const query = `SELECT DISTINCT
+        mgr.id,
+        CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
+    FROM employee emp
+        JOIN employee mgr ON emp.manager_id = mgr.id
+    WHERE emp.manager_id IS NOT NULL
+    ORDER BY mgr.first_name;`;
+
+    connection.query(query, (err, mgrList) => {
+      if (err) reject(err);
+
+      // add no choice for the manager to the list
+      mgrList.push({ id: null, Manager: "No direct manager" });
+      resolve(mgrList);
+    });
+  });
+
+const addNewEmployeeSQL = (newEmployee) =>
+  new Promise((resolve, reject) => {
     const query = `INSERT INTO employee(first_name, last_name, role_id, manager_id) VALUES (?,?,?,?)`;
 
     connection.query(query, Object.values(newEmployee), (err, results) => {
@@ -100,25 +124,30 @@ const addNewEmployeeSQL = (newEmployee) => {
       resolve({ results: results, newEmployee: newEmployee });
     });
   });
-};
 
-const addNewRoleSQL = (newRole) => {
-  return new Promise((resolve, reject) => {
+const addNewRoleSQL = (newRole) =>
+  new Promise((resolve, reject) => {
     connection.query(`INSERT INTO role SET ?`, newRole, (err, res) => {
-      if (err) throw err;
+      if (err) reject(err);
       resolve(res);
     });
   });
-};
 
-const updateEmployeeSQL = (newValues) => {
-  return new Promise((resolve, reject) => {
+const addNewDepartmentSQL = (newDept) =>
+  new Promise((resolve, reject) => {
+    connection.query(`INSERT INTO department SET ?`, newDept, (err, res) => {
+      if (err) reject(err);
+      resolve(res);
+    });
+  });
+
+const updateEmployeeSQL = (newValues) =>
+  new Promise((resolve, reject) => {
     connection.query(`UPDATE employee SET ? WHERE ?`, newValues, (err, res) => {
       if (err) reject(err);
       resolve(res);
     });
   });
-};
 
 /*** util functions ***/
 // recommended test for inquirer errors from https://www.npmjs.com/package/inquirer
@@ -245,7 +274,7 @@ function viewAllEmployees() {
 
 // view employees by department
 function viewEmployeesByDepartment() {
-  getDepartmentListSQL
+  getDepartmentListSQL()
     .then((deptList) =>
       inquirer.prompt({
         type: "list",
@@ -269,7 +298,7 @@ function viewEmployeesByDepartment() {
 
 // view employees by roles
 function viewEmployeesByRole() {
-  getRoleListSQL
+  getRoleListSQL()
     .then((roleList) =>
       inquirer.prompt({
         type: "list",
@@ -298,7 +327,7 @@ function addEmployee() {
 
   // get manager list (Any employee can be a manager)
   // get roleList -- these are done in parallel
-  Promise.all([getAllEmployeesAsManagerSQL, getRoleListSQL])
+  Promise.all([getAllEmployeesAsManagerSQL(), getRoleListSQL()])
     .then((lists) => {
       mgrList = lists[0];
       roleList = lists[1];
@@ -367,7 +396,7 @@ function updateEmployeeRole() {
   let employeeList, roleList;
 
   // get employeeList
-  Promise.all([getEmployeesAsEmployeeSQL, getRoleListSQL])
+  Promise.all([getEmployeesAsEmployeeSQL(), getRoleListSQL()])
     .then((lists) => {
       employeeList = lists[0];
       roleList = lists[1];
@@ -416,7 +445,7 @@ function updateEmployeeRole() {
 function addNewRole() {
   let departmentList;
   // get departmentList
-  getDepartmentListSQL
+  getDepartmentListSQL()
     .then((deptList) => {
       departmentList = deptList;
       // question the information
@@ -441,7 +470,6 @@ function addNewRole() {
       ]);
     })
     .then((answers) => {
-      // console.table(departmentList);
       const newRole = {
         title: answers.title,
         salary: answers.salary,
@@ -473,17 +501,13 @@ function addNewDepartment() {
       message: "What is the name of the new department?",
       name: "name",
     })
+    .then((answer) => addNewDepartmentSQL(answer).then(() => answer))
     .then((answer) => {
-      console.log(answer);
-      connection.query(`INSERT INTO department SET ?`, answer, (err, res) => {
-        if (err) throw err;
+      console.log(
+        `${answer.name} has been updated.\n\nBe sure to add the roles for this department!\n`
+      );
 
-        console.log(
-          `${answer.name} has been updated.\n\nBe sure to add the roles for this department!\n`
-        );
-
-        menu();
-      });
+      menu();
     })
     .catch((error) => {
       inquirerErr(error);
@@ -493,61 +517,35 @@ function addNewDepartment() {
 /**** bonus ****/
 // view employee by manager
 function viewEmployeesByManager() {
-  // limit list of managers to employees that ARE managers
-  connection.query(
-    `SELECT DISTINCT
-        mgr.id,
-        CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
-    FROM employee emp
-        JOIN employee mgr ON emp.manager_id = mgr.id
-    WHERE emp.manager_id IS NOT NULL
-    ORDER BY mgr.first_name;`,
-    (err, mgrList) => {
-      if (err) throw err;
+  let mgrList;
 
-      // add no choice for the manager to the list
-      mgrList.push({ id: null, Manager: "No direct manager" });
-
-      inquirer
-        .prompt({
-          type: "list",
-          message: "Which manager's employees would you like to view?",
-          choices: mgrList.map((obj) => obj.Manager),
-          name: "choice",
-        })
-        .then((answer) => {
-          const mgrId =
-            mgrList[
-              mgrList.findIndex((manager) => manager.Manager === answer.choice)
-            ].id;
-          connection.query(
-            `SELECT 
-                emp.id AS 'ID',
-                emp.first_name AS 'First Name',
-                emp.last_name AS 'Last Name',
-                role.title AS 'Role',
-                department.name AS 'Department',
-                role.salary AS 'Salary',
-                CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
-            FROM employee emp
-                JOIN role ON role_id = role.id
-                JOIN department ON role.department_id = department.id
-                LEFT JOIN employee mgr ON emp.manager_id = mgr.id
-            WHERE emp.manager_id ${mgrId === null ? "IS NULL" : "= ?"}
-            ORDER BY emp.id;`,
-            [mgrId],
-            (err, res) => {
-              if (err) throw err;
-              console.table(res);
-              menu();
-            }
-          );
-        })
-        .catch((error) => {
-          inquirerErr(error);
-        });
-    }
-  );
+  getOnlyManagersAsManagerSQL()
+    .then((managerList) => {
+      mgrList = managerList;
+      return inquirer.prompt({
+        type: "list",
+        message: "Which manager's employees would you like to view?",
+        choices: mgrList.map((obj) => obj.Manager),
+        name: "choice",
+      });
+    })
+    .then((answer) => {
+      const mgrId =
+        mgrList[
+          mgrList.findIndex((manager) => manager.Manager === answer.choice)
+        ].id;
+      return getAllEmployeesDataSQL(
+        `WHERE emp.manager_id ${mgrId === null ? "IS NULL" : "= ?"}`,
+        [mgrId]
+      );
+    })
+    .then((res) => {
+      console.table(res);
+      menu();
+    })
+    .catch((error) => {
+      inquirerErr(error);
+    });
 }
 
 // update employee managers
