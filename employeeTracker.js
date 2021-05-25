@@ -130,12 +130,12 @@ function menu() {
 }
 
 // view all employees
-function viewAllEmployees() {
-  sql.getAllEmployeesData().then((res) => {
-    console.log();
-    console.table(res);
-    menu();
-  });
+async function viewAllEmployees() {
+  const res = await sql.getAllEmployeesData();
+
+  console.log();
+  console.table(res);
+  menu();
 }
 
 // view employees by department
