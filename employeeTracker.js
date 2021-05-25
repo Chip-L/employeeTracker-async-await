@@ -1,9 +1,9 @@
 const inquirer = require("inquirer");
-const mysql = require("mysql");
 const cTable = require("console.table");
 require("dotenv").config();
 
 const connection = require("./config/config");
+const sql = require("./sqlQueries/queries");
 
 // make db connection
 connection.connect((err) => {
@@ -13,176 +13,6 @@ connection.connect((err) => {
   showStartScreen();
   menu();
 });
-
-/***  queries as promise objects ***/
-
-// returns promise of all employees -- where and matches are optional for filtering (where is the WHERE clause and matches are the objects in an array to be matched)
-const getAllEmployeesDataSQL = (where, matches) =>
-  new Promise((resolve, reject) => {
-    const query = `SELECT 
-        emp.id AS 'ID',
-        emp.first_name AS 'First Name',
-        emp.last_name AS 'Last Name',
-        role.title AS 'Title',
-        department.name as 'Department',
-        role.salary AS 'Salary',
-        CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
-    FROM employee emp
-      JOIN role ON role_id = role.id
-      JOIN department ON role.department_id = department.id
-      LEFT JOIN employee mgr ON emp.manager_id = mgr.id
-    ${!where ? "" : where}
-    ORDER BY emp.id;`;
-
-    connection.query(query, matches, (err, res) => {
-      if (err) reject(err);
-      resolve(res);
-    });
-  });
-
-const getDepartmentListSQL = () =>
-  new Promise((resolve, reject) => {
-    const query = "SELECT * FROM department;";
-    connection.query(query, (err, deptList) => {
-      if (err) reject(err);
-      resolve(deptList);
-    });
-  });
-
-const getRoleListSQL = () =>
-  new Promise((resolve, reject) => {
-    connection.query("SELECT * FROM role;", (err, roleList) => {
-      if (err) reject(err);
-      resolve(roleList);
-    });
-  });
-
-// returns a list of employees with the Employee column
-const getEmployeesAsEmployeeSQL = () =>
-  new Promise((resolve, reject) => {
-    const query = `SELECT id, CONCAT(first_name,' ', last_name) AS 'Employee'
-    FROM employee;`;
-
-    connection.query(query, (err, employeeList) => {
-      if (err) reject(err);
-      resolve(employeeList);
-    });
-  });
-
-// returns a list of employees with the manager column
-const getAllEmployeesAsManagerSQL = () =>
-  new Promise((resolve, reject) => {
-    const query = `SELECT 
-        id,
-        CONCAT(first_name, ' ', last_name) AS 'Manager'
-    FROM employee
-    ORDER BY id;`;
-
-    connection.query(query, (err, mgrList) => {
-      if (err) reject(err);
-
-      // add no choice for the manager to the list
-      mgrList.push({ id: null, Manager: "No direct manager" });
-      resolve(mgrList);
-    });
-  });
-
-// limit list of managers to employees that ARE managers
-const getOnlyManagersAsManagerSQL = () =>
-  new Promise((resolve, reject) => {
-    const query = `SELECT DISTINCT
-        mgr.id,
-        CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
-    FROM employee emp
-        JOIN employee mgr ON emp.manager_id = mgr.id
-    WHERE emp.manager_id IS NOT NULL
-    ORDER BY mgr.first_name;`;
-
-    connection.query(query, (err, mgrList) => {
-      if (err) reject(err);
-
-      // add no choice for the manager to the list
-      mgrList.push({ id: null, Manager: "No direct manager" });
-      resolve(mgrList);
-    });
-  });
-
-const getDepartmentBudgetSQL = () =>
-  new Promise((resolve, reject) => {
-    const query = `SELECT SUM(salary) AS 'Budget'
-    FROM role
-        JOIN employee ON role.id = employee.role_id
-        JOIN department ON role.department_id = department.id 
-    WHERE department_id = ?;`;
-
-    connection.query(query, [deptId], (err, budget) => {
-      if (err) reject(err);
-      resolve(budget);
-    });
-  });
-
-const addNewEmployeeSQL = (newEmployee) =>
-  new Promise((resolve, reject) => {
-    const query = `INSERT INTO employee(first_name, last_name, role_id, manager_id) VALUES (?,?,?,?)`;
-
-    connection.query(query, Object.values(newEmployee), (err, results) => {
-      if (err) reject(err);
-      // console.log("in promise: ", results);
-      resolve({ results: results, newEmployee: newEmployee });
-    });
-  });
-
-const addNewRoleSQL = (newRole) =>
-  new Promise((resolve, reject) => {
-    connection.query(`INSERT INTO role SET ?`, newRole, (err, res) => {
-      if (err) reject(err);
-      resolve(res);
-    });
-  });
-
-const addNewDepartmentSQL = (newDept) =>
-  new Promise((resolve, reject) => {
-    connection.query(`INSERT INTO department SET ?`, newDept, (err, res) => {
-      if (err) reject(err);
-      resolve(res);
-    });
-  });
-
-const updateEmployeeSQL = (newValues) =>
-  new Promise((resolve, reject) => {
-    connection.query(`UPDATE employee SET ? WHERE ?`, newValues, (err, res) => {
-      if (err) reject(err);
-      resolve(res);
-    });
-  });
-
-const deleteEmployeeSQL = (empId) =>
-  new Promise((resolve, reject) => {
-    connection.query(`DELETE FROM employee WHERE id = ?`, empId, (err, res) => {
-      if (err) reject(err);
-      resolve(res);
-    });
-  });
-
-const deleteRoleSQL = (roleId) =>
-  new Promise((resolve, reject) => {
-    connection.query(`DELETE FROM role WHERE id = ?`, roleId, (err, res) => {
-      if (err) reject(err);
-      resolve(res);
-    });
-  });
-
-const deleteDepartmentSQL = (deptId) =>
-  new Promise((resolve, reject) => {
-    connection.query(
-      `DELETE FROM department WHERE id = ?`,
-      deptId,
-      (err, res) => {
-        if (err) reject(err);
-        resolve(res);
-      }
-    );
-  });
 
 /*** util functions ***/
 // recommended test for inquirer errors from https://www.npmjs.com/package/inquirer
@@ -301,7 +131,7 @@ function menu() {
 
 // view all employees
 function viewAllEmployees() {
-  getAllEmployeesDataSQL().then((res) => {
+  sql.getAllEmployeesData().then((res) => {
     console.log();
     console.table(res);
     menu();
@@ -310,7 +140,8 @@ function viewAllEmployees() {
 
 // view employees by department
 function viewEmployeesByDepartment() {
-  getDepartmentListSQL()
+  sql
+    .getDepartmentList()
     .then((deptList) =>
       inquirer.prompt({
         type: "list",
@@ -320,7 +151,7 @@ function viewEmployeesByDepartment() {
       })
     )
     .then((answer) =>
-      getAllEmployeesDataSQL("WHERE ?", [{ name: answer.choice }])
+      sql.getAllEmployeesData("WHERE ?", [{ name: answer.choice }])
     )
     .then((res) => {
       console.log();
@@ -334,7 +165,8 @@ function viewEmployeesByDepartment() {
 
 // view employees by roles
 function viewEmployeesByRole() {
-  getRoleListSQL()
+  sql
+    .getRoleList()
     .then((roleList) =>
       inquirer.prompt({
         type: "list",
@@ -344,7 +176,7 @@ function viewEmployeesByRole() {
       })
     )
     .then((answer) =>
-      getAllEmployeesDataSQL("WHERE ?", [{ title: answer.choice }])
+      sql.getAllEmployeesData("WHERE ?", [{ title: answer.choice }])
     )
     .then((employeeList) => {
       console.log();
@@ -363,7 +195,7 @@ function addEmployee() {
 
   // get manager list (Any employee can be a manager)
   // get roleList -- these are done in parallel
-  Promise.all([getAllEmployeesAsManagerSQL(), getRoleListSQL()])
+  Promise.all([sql.getAllEmployeesAsManager(), sql.getRoleList()])
     .then((lists) => {
       mgrList = lists[0];
       roleList = lists[1];
@@ -409,7 +241,7 @@ function addEmployee() {
       return newEmployee;
     })
     // add employee to DB
-    .then((newEmployee) => addNewEmployeeSQL(newEmployee))
+    .then((newEmployee) => sql.addNewEmployee(newEmployee))
     .then(({ results, newEmployee }) => {
       console.log();
       console.log(
@@ -432,7 +264,7 @@ function updateEmployeeRole() {
   let employeeList, roleList;
 
   // get employeeList
-  Promise.all([getEmployeesAsEmployeeSQL(), getRoleListSQL()])
+  Promise.all([sql.getEmployeesAsEmployee(), sql.getRoleList()])
     .then((lists) => {
       employeeList = lists[0];
       roleList = lists[1];
@@ -463,7 +295,7 @@ function updateEmployeeRole() {
           roleList[roleList.findIndex((role) => role.title === answers.role)]
             .id,
       };
-      return updateEmployeeSQL([roleId, empId]).then(() => answers);
+      return sql.updateEmployee([roleId, empId]).then(() => answers);
     })
     .then((answers) => {
       console.log();
@@ -481,7 +313,8 @@ function updateEmployeeRole() {
 function addNewRole() {
   let departmentList;
   // get departmentList
-  getDepartmentListSQL()
+  sql
+    .getDepartmentList()
     .then((deptList) => {
       departmentList = deptList;
       // question the information
@@ -516,7 +349,7 @@ function addNewRole() {
       };
 
       // add role to DB
-      return addNewRoleSQL(newRole).then(() => newRole);
+      return sql.addNewRole(newRole).then(() => newRole);
     })
     .then((newRole) => {
       console.log();
@@ -537,7 +370,7 @@ function addNewDepartment() {
       message: "What is the name of the new department?",
       name: "name",
     })
-    .then((answer) => addNewDepartmentSQL(answer).then(() => answer))
+    .then((answer) => sql.addNewDepartment(answer).then(() => answer))
     .then((answer) => {
       console.log(
         `${answer.name} has been updated.\n\nBe sure to add the roles for this department!\n`
@@ -555,7 +388,8 @@ function addNewDepartment() {
 function viewEmployeesByManager() {
   let mgrList;
 
-  getOnlyManagersAsManagerSQL()
+  sql
+    .getOnlyManagersAsManager()
     .then((managerList) => {
       mgrList = managerList;
       return inquirer.prompt({
@@ -570,7 +404,7 @@ function viewEmployeesByManager() {
         mgrList[
           mgrList.findIndex((manager) => manager.Manager === answer.choice)
         ].id;
-      return getAllEmployeesDataSQL(
+      return sql.getAllEmployeesData(
         `WHERE emp.manager_id ${mgrId === null ? "IS NULL" : "= ?"}`,
         [mgrId]
       );
@@ -589,7 +423,7 @@ function updateEmployeeManager() {
   let employeeList;
   let managerList;
   // get employee to change
-  Promise.all([getEmployeesAsEmployeeSQL(), getAllEmployeesAsManagerSQL()])
+  Promise.all([sql.getEmployeesAsEmployee(), sql.getAllEmployeesAsManager()])
     .then((lists) => {
       employeeList = lists[0];
       managerList = lists[1];
@@ -627,7 +461,7 @@ function updateEmployeeManager() {
           ].id,
       };
 
-      return updateEmployeeSQL([mgrId, empId]).then(() => answers);
+      return sql.updateEmployee([mgrId, empId]).then(() => answers);
     })
     .then((answers) => {
       console.log();
@@ -646,7 +480,8 @@ function updateEmployeeManager() {
 function removeEmployee() {
   let employeeList;
 
-  getEmployeesAsEmployeeSQL()
+  sql
+    .getEmployeesAsEmployee()
     .then((empList) => {
       employeeList = empList;
       return inquirer.prompt({
@@ -661,7 +496,7 @@ function removeEmployee() {
         employeeList[
           employeeList.findIndex((emp) => emp.Employee === answer.employee)
         ].id;
-      return deleteEmployeeSQL(empId).then(() => answer);
+      return sql.deleteEmployee(empId).then(() => answer);
     })
     .then((answer) => {
       console.log();
@@ -679,7 +514,8 @@ function removeEmployee() {
 function removeRole() {
   let roleList;
 
-  getRoleListSQL()
+  sql
+    .getRoleList()
     .then((list) => {
       roleList = list;
       return inquirer.prompt({
@@ -693,7 +529,7 @@ function removeRole() {
       const roleId =
         roleList[roleList.findIndex((role) => role.title === answer.role)].id;
 
-      return deleteRoleSQL(roleId).then(() => answer);
+      return sql.deleteRole(roleId).then(() => answer);
     })
     .then((answer) => {
       console.log();
@@ -711,7 +547,8 @@ function removeRole() {
 function removeDepartment() {
   let departmentList;
 
-  getDepartmentListSQL()
+  sql
+    .getDepartmentList()
     .then((deptList) => {
       departmentList = deptList;
 
@@ -728,7 +565,7 @@ function removeDepartment() {
           departmentList.findIndex((dept) => dept.name === answer.dept)
         ].id;
 
-      return deleteDepartmentSQL(deptId).then(() => answer);
+      return sql.deleteDepartment(deptId).then(() => answer);
     })
     .then((answer) => {
       console.log();
@@ -745,7 +582,8 @@ function removeDepartment() {
 function viewDepartmentBudget() {
   let departmentList;
 
-  getDepartmentListSQL()
+  sql
+    .getDepartmentList()
     .then((deptList) => {
       departmentList = deptList;
       return inquirer.prompt({
@@ -761,7 +599,7 @@ function viewDepartmentBudget() {
           departmentList.findIndex((dept) => dept.name === answer.dept)
         ].id;
 
-      return getDepartmentBudgetSQL().then((budget) => {
+      return sql.getDepartmentBudget().then((budget) => {
         return { budget: budget, answer: answer };
       });
     })
