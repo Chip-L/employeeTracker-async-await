@@ -253,53 +253,47 @@ async function addEmployee() {
 }
 
 // update employee roles
-function updateEmployeeRole() {
-  let employeeList, roleList;
+async function updateEmployeeRole() {
+  try {
+    const [employeeList, roleList] = await Promise.all([
+      sql.getEmployeesAsEmployee(),
+      sql.getRoleList(),
+    ]);
 
-  // get employeeList
-  Promise.all([sql.getEmployeesAsEmployee(), sql.getRoleList()])
-    .then((lists) => {
-      employeeList = lists[0];
-      roleList = lists[1];
+    const answer = await inquirer.prompt([
+      {
+        type: "list",
+        message: "Which employee would you like to change?",
+        choices: employeeList.map((emp) => emp.Employee),
+        name: "employee",
+      },
+      {
+        type: "list",
+        message: "What is the new role?",
+        choices: roleList.map((role) => role.title),
+        name: "role",
+      },
+    ]);
 
-      return inquirer.prompt([
-        {
-          type: "list",
-          message: "Which employee would you like to change?",
-          choices: employeeList.map((emp) => emp.Employee),
-          name: "employee",
-        },
-        {
-          type: "list",
-          message: "What is the new role?",
-          choices: roleList.map((role) => role.title),
-          name: "role",
-        },
-      ]);
-    })
-    .then((answers) => {
-      const empId = {
-        id: employeeList[
-          employeeList.findIndex((emp) => emp.Employee === answers.employee)
-        ].id,
-      };
-      const roleId = {
-        role_id:
-          roleList[roleList.findIndex((role) => role.title === answers.role)]
-            .id,
-      };
-      return sql.updateEmployee([roleId, empId]).then(() => answers);
-    })
-    .then((answers) => {
-      console.log();
-      console.log(
-        `${answers.employee} has been updated to the new role ${answers.role}`
-      );
-      menu();
-    })
-    .catch((error) => {
-      inquirerErr(error);
-    });
+    const empId = {
+      id: employeeList[
+        employeeList.findIndex((emp) => emp.Employee === answer.employee)
+      ].id,
+    };
+    const roleId = {
+      role_id:
+        roleList[roleList.findIndex((role) => role.title === answer.role)].id,
+    };
+    await sql.updateEmployee([roleId, empId]);
+
+    console.log();
+    console.log(
+      `${answer.employee} has been updated to the new role ${answer.role}`
+    );
+    menu();
+  } catch (error) {
+    inquirerErr(error);
+  }
 }
 
 // add roles
