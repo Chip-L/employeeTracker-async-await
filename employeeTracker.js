@@ -188,74 +188,68 @@ async function viewEmployeesByRole() {
 }
 
 // add employees
-function addEmployee() {
-  // set these variables so they are accessible throughout the chain
-  let mgrList, roleList;
+async function addEmployee() {
+  try {
+    // get manager list (Any employee can be a manager)
+    // get roleList -- these are done in parallel
+    const [mgrList, roleList] = await Promise.all([
+      sql.getAllEmployeesAsManager(),
+      sql.getRoleList(),
+    ]);
 
-  // get manager list (Any employee can be a manager)
-  // get roleList -- these are done in parallel
-  Promise.all([sql.getAllEmployeesAsManager(), sql.getRoleList()])
-    .then((lists) => {
-      mgrList = lists[0];
-      roleList = lists[1];
+    // get employee information (first name, last name, manager, role (department is not needed as it is tied to role))
+    const answer = await inquirer.prompt([
+      {
+        type: "input",
+        message: "Employee's first name: ",
+        name: "firstName",
+        validate: (firstName) => /^[a-zA-Z]+( [a-zA-Z]*)*$/.test(firstName),
+      },
+      {
+        type: "input",
+        message: "Employee's last name: ",
+        name: "lastName",
+        validate: (lastName) => /^[a-zA-Z]+( [a-zA-Z]*)*$/.test(lastName),
+      },
+      {
+        type: "list",
+        message: "What is the employee's role? ",
+        choices: roleList.map((role) => role.title),
+        name: "role",
+      },
+      {
+        type: "list",
+        message: "Who is the direct manager? ",
+        choices: mgrList.map((manager) => manager.Manager),
+        name: "manager",
+      },
+    ]);
 
-      // get employee information (first name, last name, manager, role (department is not needed as it is tied to role))
-      return inquirer.prompt([
-        {
-          type: "input",
-          message: "Employee's first name: ",
-          name: "firstName",
-          validate: (firstName) => /^[a-zA-Z]+( [a-zA-Z]*)*$/.test(firstName),
-        },
-        {
-          type: "input",
-          message: "Employee's last name: ",
-          name: "lastName",
-          validate: (lastName) => /^[a-zA-Z]+( [a-zA-Z]*)*$/.test(lastName),
-        },
-        {
-          type: "list",
-          message: "What is the employee's role? ",
-          choices: roleList.map((role) => role.title),
-          name: "role",
-        },
-        {
-          type: "list",
-          message: "Who is the direct manager? ",
-          choices: mgrList.map((manager) => manager.Manager),
-          name: "manager",
-        },
-      ]);
-    })
-    .then((answer) => {
-      const newEmployee = {
-        first_name: answer.firstName,
-        last_name: answer.lastName,
-        role_id:
-          roleList[roleList.findIndex((role) => role.title === answer.role)].id,
-        manager_id:
-          mgrList[mgrList.findIndex((mgr) => mgr.Manager === answer.manager)]
-            .id,
-      };
-      return newEmployee;
-    })
+    const newEmployee = {
+      first_name: answer.firstName,
+      last_name: answer.lastName,
+      role_id:
+        roleList[roleList.findIndex((role) => role.title === answer.role)].id,
+      manager_id:
+        mgrList[mgrList.findIndex((mgr) => mgr.Manager === answer.manager)].id,
+    };
+
     // add employee to DB
-    .then((newEmployee) => sql.addNewEmployee(newEmployee))
-    .then(({ results, newEmployee }) => {
-      console.log();
-      console.log(
-        `${newEmployee.first_name} ${
-          newEmployee.last_name
-        } has been created with Employee ID: ${
-          results.insertId
-        } and a salary of $${roleList[newEmployee.role_id].salary}.`
-      );
+    const results = await sql.addNewEmployee(newEmployee);
 
-      menu();
-    })
-    .catch((error) => {
-      inquirerErr(error);
-    });
+    console.log();
+    console.log(
+      `${newEmployee.first_name} ${
+        newEmployee.last_name
+      } has been created with Employee ID: ${
+        results.insertId
+      } and a salary of $${roleList[newEmployee.role_id].salary}.`
+    );
+
+    menu();
+  } catch (error) {
+    inquirerErr(error);
+  }
 }
 
 // update employee roles

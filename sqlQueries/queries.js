@@ -114,7 +114,7 @@ const addNewEmployee = (newEmployee) =>
     connection.query(query, Object.values(newEmployee), (err, results) => {
       if (err) reject(err);
       // console.log("in promise: ", results);
-      resolve({ results: results, newEmployee: newEmployee });
+      resolve(results);
     });
   });
 
