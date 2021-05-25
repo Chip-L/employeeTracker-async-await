@@ -179,29 +179,24 @@ function viewAllEmployees() {
 
 // view employees by department
 function viewEmployeesByDepartment() {
-  getDepartmentList.then((deptList) => {
-    inquirer
-      .prompt({
+  getDepartmentList
+    .then((deptList) =>
+      inquirer.prompt({
         type: "list",
         message: "Which department would you like to view?",
         choices: deptList.map((dept) => dept.name),
         name: "choice",
       })
-      .then((answer) => {
-        getAllEmployees("WHERE ?", [{ name: answer.choice }])
-          .then((res) => {
-            console.log();
-            console.table(res);
-            menu();
-          })
-          .catch((err) => {
-            throw err;
-          });
-      })
-      .catch((error) => {
-        inquirerErr(error);
-      });
-  });
+    )
+    .then((answer) => getAllEmployees("WHERE ?", [{ name: answer.choice }]))
+    .then((res) => {
+      console.log();
+      console.table(res);
+      menu();
+    })
+    .catch((err) => {
+      inquirerErr(err);
+    });
 }
 
 // view employees by roles
