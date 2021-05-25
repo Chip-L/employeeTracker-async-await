@@ -164,28 +164,27 @@ async function viewEmployeesByDepartment() {
 }
 
 // view employees by roles
-function viewEmployeesByRole() {
-  sql
-    .getRoleList()
-    .then((roleList) =>
-      inquirer.prompt({
-        type: "list",
-        message: "Which employee role would you like to view?",
-        choices: roleList.map((obj) => obj.title),
-        name: "choice",
-      })
-    )
-    .then((answer) =>
-      sql.getAllEmployeesData("WHERE ?", [{ title: answer.choice }])
-    )
-    .then((employeeList) => {
-      console.log();
-      console.table(employeeList);
-      menu();
-    })
-    .catch((error) => {
-      inquirerErr(error);
+async function viewEmployeesByRole() {
+  try {
+    const roleList = await sql.getRoleList();
+
+    const answer = await inquirer.prompt({
+      type: "list",
+      message: "Which employee role would you like to view?",
+      choices: roleList.map((obj) => obj.title),
+      name: "choice",
     });
+
+    const employeeList = await sql.getAllEmployeesData("WHERE ?", {
+      title: answer.choice,
+    });
+
+    console.log();
+    console.table(employeeList);
+    menu();
+  } catch (error) {
+    inquirerErr(error);
+  }
 }
 
 // add employees
