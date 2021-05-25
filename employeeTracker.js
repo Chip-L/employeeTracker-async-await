@@ -140,28 +140,27 @@ async function viewAllEmployees() {
 }
 
 // view employees by department
-function viewEmployeesByDepartment() {
-  sql
-    .getDepartmentList()
-    .then((deptList) =>
-      inquirer.prompt({
-        type: "list",
-        message: "Which department would you like to view?",
-        choices: deptList.map((dept) => dept.name),
-        name: "choice",
-      })
-    )
-    .then((answer) =>
-      sql.getAllEmployeesData("WHERE ?", [{ name: answer.choice }])
-    )
-    .then((res) => {
-      console.log();
-      console.table(res);
-      menu();
-    })
-    .catch((err) => {
-      inquirerErr(err);
+async function viewEmployeesByDepartment() {
+  try {
+    const deptList = await sql.getDepartmentList();
+
+    const answer = await inquirer.prompt({
+      type: "list",
+      message: "Which department would you like to view?",
+      choices: deptList.map((dept) => dept.name),
+      name: "choice",
     });
+
+    const res = await sql.getAllEmployeesData("WHERE ?", [
+      { name: answer.choice },
+    ]);
+
+    console.log();
+    console.table(res);
+    menu();
+  } catch (err) {
+    inquirerErr(err);
+  }
 }
 
 // view employees by roles
