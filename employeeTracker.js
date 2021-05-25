@@ -153,9 +153,28 @@ const deleteEmployeeSQL = (empId) =>
   new Promise((resolve, reject) => {
     connection.query(`DELETE FROM employee WHERE id = ?`, empId, (err, res) => {
       if (err) reject(err);
-      console.log(res);
       resolve(res);
     });
+  });
+
+const deleteRoleSQL = (roleId) =>
+  new Promise((resolve, reject) => {
+    connection.query(`DELETE FROM role WHERE id = ?`, roleId, (err, res) => {
+      if (err) reject(err);
+      resolve(res);
+    });
+  });
+
+const deleteDepartmentSQL = (deptId) =>
+  new Promise((resolve, reject) => {
+    connection.query(
+      `DELETE FROM department WHERE id = ?`,
+      deptId,
+      (err, res) => {
+        if (err) reject(err);
+        resolve(res);
+      }
+    );
   });
 
 /*** util functions ***/
@@ -650,73 +669,68 @@ function removeEmployee() {
 // delete roles
 //TODO: add list of employees now stranded without roles or verify no Employees have role being deleted
 function removeRole() {
-  connection.query(`SELECT * FROM role;`, (err, roleList) => {
-    if (err) throw err;
+  let roleList;
 
-    inquirer
-      .prompt({
+  getRoleListSQL()
+    .then((list) => {
+      roleList = list;
+      return inquirer.prompt({
         type: "list",
         message: "Which role would you like to delete?",
         choices: roleList.map((role) => role.title),
         name: "role",
-      })
-      .then((answer) => {
-        const roleId =
-          roleList[roleList.findIndex((role) => role.title === answer.role)].id;
-
-        connection.query(
-          `DELETE FROM role WHERE id = ?`,
-          [roleId],
-          (err, res) => {
-            if (err) throw err;
-
-            console.log(`${answer.role} has been removed.`);
-
-            menu();
-          }
-        );
-      })
-      .catch((error) => {
-        inquirerErr(error);
       });
-  });
+    })
+    .then((answer) => {
+      const roleId =
+        roleList[roleList.findIndex((role) => role.title === answer.role)].id;
+
+      return deleteRoleSQL(roleId).then(() => answer);
+    })
+    .then((answer) => {
+      console.log();
+      console.log(`${answer.role} has been removed.`);
+
+      menu();
+    })
+    .catch((error) => {
+      inquirerErr(error);
+    });
 }
 
 // delete department
 //TODO: add list of employees and roles now stranded without department or verify no Employees/Roles have department being deleted
 function removeDepartment() {
-  connection.query(`SELECT * FROM department`, (err, departmentList) => {
-    if (err) throw err;
+  let departmentList;
 
-    inquirer
-      .prompt({
+  getDepartmentListSQL()
+    .then((deptList) => {
+      departmentList = deptList;
+
+      return inquirer.prompt({
         type: "list",
         message: "Which department would you like to remove?",
         choices: departmentList.map((dept) => dept.name),
         name: "dept",
-      })
-      .then((answer) => {
-        deptId =
-          departmentList[
-            departmentList.findIndex((dept) => dept.name === answer.dept)
-          ].id;
-
-        connection.query(
-          `DELETE FROM department WHERE id = ?`,
-          [deptId],
-          (err, res) => {
-            if (err) throw err;
-
-            console.log(`${answer.dept} has been removed.`);
-
-            menu();
-          }
-        );
-      })
-      .catch((error) => {
-        inquirerErr(error);
       });
-  });
+    })
+    .then((answer) => {
+      deptId =
+        departmentList[
+          departmentList.findIndex((dept) => dept.name === answer.dept)
+        ].id;
+
+      return deleteDepartmentSQL(deptId).then(() => answer);
+    })
+    .then((answer) => {
+      console.log();
+      console.log(`${answer.dept} has been removed.`);
+
+      menu();
+    })
+    .catch((error) => {
+      inquirerErr(error);
+    });
 }
 
 // View the total utilized budget of a department -- ie the combined salaries of all employees in that department
