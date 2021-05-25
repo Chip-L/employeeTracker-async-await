@@ -55,6 +55,16 @@ const getDepartmentList = new Promise((resolve, reject) => {
   });
 });
 
+/*** util functions ***/
+// recommended test for inquirer errors from https://www.npmjs.com/package/inquirer
+const inquirerErr = (error) => {
+  if (error.isTtyError) {
+    throw new Error("Prompt couldn't be rendered in the current environment.");
+  } else {
+    throw error;
+  }
+};
+
 const showStartScreen = () => {
   console.log(",---------------------------------------------------.");
   console.log("|   _____                 _                         |");
@@ -154,13 +164,7 @@ function menu() {
       }
     })
     .catch((error) => {
-      if (error.isTtyError) {
-        throw new Error(
-          "Prompt couldn't be rendered in the current environment."
-        );
-      } else {
-        throw error;
-      }
+      inquirerErr(error);
     });
 }
 
@@ -195,13 +199,7 @@ function viewEmployeesByDepartment() {
           });
       })
       .catch((error) => {
-        if (error.isTtyError) {
-          throw new Error(
-            "Prompt couldn't be rendered in the current environment."
-          );
-        } else {
-          throw error;
-        }
+        inquirerErr(error);
       });
   });
 }
@@ -242,13 +240,7 @@ function viewEmployeesByRole() {
         );
       })
       .catch((error) => {
-        if (error.isTtyError) {
-          throw new Error(
-            "Prompt couldn't be rendered in the current environment."
-          );
-        } else {
-          throw error;
-        }
+        inquirerErr(error);
       });
   });
 }
@@ -317,8 +309,9 @@ function addEmployee() {
                 ].id,
             };
 
-            console.log(Object.values(newEmployee));
+            // console.log(Object.values(newEmployee));
 
+            // add employee to DB
             connection.query(
               `INSERT INTO employee(first_name, last_name, role_id, manager_id)
               VALUES (?,?,?,?)`,
@@ -337,17 +330,9 @@ function addEmployee() {
                 menu();
               }
             );
-
-            // add employee to DB
           })
           .catch((error) => {
-            if (error.isTtyError) {
-              throw new Error(
-                "Prompt couldn't be rendered in the current environment."
-              );
-            } else {
-              throw error;
-            }
+            inquirerErr(error);
           });
       });
     }
@@ -412,21 +397,12 @@ function updateEmployeeRole() {
               );
             })
             .catch((error) => {
-              if (error.isTtyError) {
-                throw new Error(
-                  "Prompt couldn't be rendered in the current environment."
-                );
-              } else {
-                throw error;
-              }
+              inquirerErr(error);
             });
         }
       );
     }
   );
-  // get roleList
-  // ask which employee and role to update
-  // update DB
 }
 
 // add roles
@@ -477,13 +453,7 @@ function addNewRole() {
         });
       })
       .catch((error) => {
-        if (error.isTtyError) {
-          throw new Error(
-            "Prompt couldn't be rendered in the current environment."
-          );
-        } else {
-          throw error;
-        }
+        inquirerErr(error);
       });
   });
 }
@@ -509,13 +479,7 @@ function addNewDepartment() {
       });
     })
     .catch((error) => {
-      if (error.isTtyError) {
-        throw new Error(
-          "Prompt couldn't be rendered in the current environment."
-        );
-      } else {
-        throw error;
-      }
+      inquirerErr(error);
     });
 }
 
@@ -573,13 +537,7 @@ function viewEmployeesByManager() {
           );
         })
         .catch((error) => {
-          if (error.isTtyError) {
-            throw new Error(
-              "Prompt couldn't be rendered in the current environment."
-            );
-          } else {
-            throw error;
-          }
+          inquirerErr(error);
         });
     }
   );
@@ -648,13 +606,7 @@ function updateEmployeeManager() {
           );
         })
         .catch((error) => {
-          if (error.isTtyError) {
-            throw new Error(
-              "Prompt couldn't be rendered in the current environment."
-            );
-          } else {
-            throw error;
-          }
+          inquirerErr(error);
         });
     }
   );
@@ -697,13 +649,7 @@ function removeEmployee() {
           );
         })
         .catch((error) => {
-          if (error.isTtyError) {
-            throw new Error(
-              "Prompt couldn't be rendered in the current environment."
-            );
-          } else {
-            throw error;
-          }
+          inquirerErr(error);
         });
     }
   );
@@ -739,13 +685,7 @@ function removeRole() {
         );
       })
       .catch((error) => {
-        if (error.isTtyError) {
-          throw new Error(
-            "Prompt couldn't be rendered in the current environment."
-          );
-        } else {
-          throw error;
-        }
+        inquirerErr(error);
       });
   });
 }
@@ -782,13 +722,7 @@ function removeDepartment() {
         );
       })
       .catch((error) => {
-        if (error.isTtyError) {
-          throw new Error(
-            "Prompt couldn't be rendered in the current environment."
-          );
-        } else {
-          throw error;
-        }
+        inquirerErr(error);
       });
   });
 }
@@ -831,13 +765,7 @@ function viewDepartmentBudget() {
         console.log();
       })
       .catch((error) => {
-        if (error.isTtyError) {
-          throw new Error(
-            "Prompt couldn't be rendered in the current environment."
-          );
-        } else {
-          throw error;
-        }
+        inquirerErr(error);
       });
   });
 }
