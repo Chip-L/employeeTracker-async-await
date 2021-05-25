@@ -1,17 +1,30 @@
 const inquirer = require("inquirer");
-const mysql = require("mysql");
 const cTable = require("console.table");
 require("dotenv").config();
 
-// create mysql connection
-const connection = mysql.createConnection({
-  host: "localhost",
-  port: 3306,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+const connection = require("./config/config");
+const sql = require("./sqlQueries/queries");
+
+// make db connection
+connection.connect((err) => {
+  if (err) throw err;
+  console.log(`connected as is ${connection.threadId}\n`);
+
+  showStartScreen();
+  menu();
 });
 
+/*** util functions ***/
+// recommended test for inquirer errors from https://www.npmjs.com/package/inquirer
+const inquirerErr = (error) => {
+  if (error.isTtyError) {
+    throw new Error("Prompt couldn't be rendered in the current environment.");
+  } else {
+    throw error;
+  }
+};
+
+/*** Start program execution ***/
 const showStartScreen = () => {
   console.log(",---------------------------------------------------.");
   console.log("|   _____                 _                         |");
@@ -33,6 +46,7 @@ const showStartScreen = () => {
 
 // get options
 function menu() {
+  console.log();
   inquirer
     .prompt([
       {
@@ -111,320 +125,200 @@ function menu() {
       }
     })
     .catch((error) => {
-      if (error.isTtyError) {
-        throw new Error(
-          "Prompt couldn't be rendered in the current environment."
-        );
-      } else {
-        throw error;
-      }
+      inquirerErr(error);
     });
 }
 
 // view all employees
 function viewAllEmployees() {
-  connection.query(
-    `SELECT 
-        emp.id AS 'ID',
-        emp.first_name AS 'First Name',
-        emp.last_name AS 'Last Name',
-        role.title AS 'Title',
-        department.name as 'Department',
-        role.salary AS 'Salary',
-        CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
-    FROM employee emp
-      JOIN role ON role_id = role.id
-      JOIN department ON role.department_id = department.id
-      LEFT JOIN employee mgr ON emp.manager_id = mgr.id
-    ORDER BY emp.id;`,
-    (err, res) => {
-      if (err) throw err;
-      console.log();
-      console.table(res);
-      menu();
-    }
-  );
+  sql.getAllEmployeesData().then((res) => {
+    console.log();
+    console.table(res);
+    menu();
+  });
 }
 
 // view employees by department
 function viewEmployeesByDepartment() {
-  connection.query("SELECT * FROM department;", (err, deptList) => {
-    if (err) throw err;
-    inquirer
-      .prompt({
+  sql
+    .getDepartmentList()
+    .then((deptList) =>
+      inquirer.prompt({
         type: "list",
         message: "Which department would you like to view?",
-        choices: deptList.map((obj) => obj.name),
+        choices: deptList.map((dept) => dept.name),
         name: "choice",
       })
-      .then((answer) => {
-        connection.query(
-          `SELECT 
-              emp.id AS 'ID',
-              emp.first_name AS 'First Name',
-              emp.last_name AS 'Last Name',
-              role.title AS 'Role',
-              department.name AS 'Department',
-              role.salary AS 'Salary',
-              CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
-          FROM employee emp
-              JOIN role ON role_id = role.id
-              JOIN department ON role.department_id = department.id
-              LEFT JOIN employee mgr ON emp.manager_id = mgr.id
-          WHERE department.name = ?
-          ORDER BY emp.id;`,
-          [answer.choice],
-          (err, employeeList) => {
-            if (err) throw err;
-            console.table(employeeList);
-            menu();
-          }
-        );
-      })
-      .catch((error) => {
-        if (error.isTtyError) {
-          throw new Error(
-            "Prompt couldn't be rendered in the current environment."
-          );
-        } else {
-          throw error;
-        }
-      });
-  });
+    )
+    .then((answer) =>
+      sql.getAllEmployeesData("WHERE ?", [{ name: answer.choice }])
+    )
+    .then((res) => {
+      console.log();
+      console.table(res);
+      menu();
+    })
+    .catch((err) => {
+      inquirerErr(err);
+    });
 }
 
 // view employees by roles
 function viewEmployeesByRole() {
-  connection.query("SELECT * FROM role;", (err, roleList) => {
-    if (err) throw err;
-    inquirer
-      .prompt({
+  sql
+    .getRoleList()
+    .then((roleList) =>
+      inquirer.prompt({
         type: "list",
         message: "Which employee role would you like to view?",
         choices: roleList.map((obj) => obj.title),
         name: "choice",
       })
-      .then((answer) => {
-        connection.query(
-          `SELECT 
-              emp.id AS 'ID',
-              emp.first_name AS 'First Name',
-              emp.last_name AS 'Last Name',
-              role.title AS 'Role',
-              department.name AS 'Department',
-              role.salary AS 'Salary',
-              CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
-          FROM employee emp
-              JOIN role ON role_id = role.id
-              JOIN department ON role.department_id = department.id
-              LEFT JOIN employee mgr ON emp.manager_id = mgr.id
-          WHERE role.title = ?
-          ORDER BY emp.id;`,
-          [answer.choice],
-          (err, employeeList) => {
-            if (err) throw err;
-            console.table(employeeList);
-            menu();
-          }
-        );
-      })
-      .catch((error) => {
-        if (error.isTtyError) {
-          throw new Error(
-            "Prompt couldn't be rendered in the current environment."
-          );
-        } else {
-          throw error;
-        }
-      });
-  });
+    )
+    .then((answer) =>
+      sql.getAllEmployeesData("WHERE ?", [{ title: answer.choice }])
+    )
+    .then((employeeList) => {
+      console.log();
+      console.table(employeeList);
+      menu();
+    })
+    .catch((error) => {
+      inquirerErr(error);
+    });
 }
 
 // add employees
 function addEmployee() {
+  // set these variables so they are accessible throughout the chain
+  let mgrList, roleList;
+
   // get manager list (Any employee can be a manager)
-  connection.query(
-    `SELECT 
-        id,
-        CONCAT(first_name, ' ', last_name) AS 'Manager'
-    FROM employee
-    ORDER BY id;`,
-    (err, mgrList) => {
-      if (err) throw err;
+  // get roleList -- these are done in parallel
+  Promise.all([sql.getAllEmployeesAsManager(), sql.getRoleList()])
+    .then((lists) => {
+      mgrList = lists[0];
+      roleList = lists[1];
 
-      // add no choice for the manager to the list
-      mgrList.push({ id: null, Manager: "No direct manager" });
+      // get employee information (first name, last name, manager, role (department is not needed as it is tied to role))
+      return inquirer.prompt([
+        {
+          type: "input",
+          message: "Employee's first name: ",
+          name: "firstName",
+          validate: (firstName) => /^[a-zA-Z]+( [a-zA-Z]*)*$/.test(firstName),
+        },
+        {
+          type: "input",
+          message: "Employee's last name: ",
+          name: "lastName",
+          validate: (lastName) => /^[a-zA-Z]+( [a-zA-Z]*)*$/.test(lastName),
+        },
+        {
+          type: "list",
+          message: "What is the employee's role? ",
+          choices: roleList.map((role) => role.title),
+          name: "role",
+        },
+        {
+          type: "list",
+          message: "Who is the direct manager? ",
+          choices: mgrList.map((manager) => manager.Manager),
+          name: "manager",
+        },
+      ]);
+    })
+    .then((answer) => {
+      const newEmployee = {
+        first_name: answer.firstName,
+        last_name: answer.lastName,
+        role_id:
+          roleList[roleList.findIndex((role) => role.title === answer.role)].id,
+        manager_id:
+          mgrList[mgrList.findIndex((mgr) => mgr.Manager === answer.manager)]
+            .id,
+      };
+      return newEmployee;
+    })
+    // add employee to DB
+    .then((newEmployee) => sql.addNewEmployee(newEmployee))
+    .then(({ results, newEmployee }) => {
+      console.log();
+      console.log(
+        `${newEmployee.first_name} ${
+          newEmployee.last_name
+        } has been created with Employee ID: ${
+          results.insertId
+        } and a salary of $${roleList[newEmployee.role_id].salary}.`
+      );
 
-      // get list of roles
-      connection.query("SELECT * FROM role;", (err, roleList) => {
-        if (err) throw err;
-
-        // get employee information (first name, last name, manager, role (department is not needed as it is tied to role))
-        inquirer
-          .prompt([
-            {
-              type: "input",
-              message: "Employee's first name: ",
-              name: "firstName",
-              validate: (firstName) =>
-                /^[a-zA-Z]+( [a-zA-Z]*)*$/.test(firstName),
-            },
-            {
-              type: "input",
-              message: "Employee's last name: ",
-              name: "lastName",
-              validate: (lastName) => /^[a-zA-Z]+( [a-zA-Z]*)*$/.test(lastName),
-            },
-            {
-              type: "list",
-              message: "What is the employee's role? ",
-              choices: roleList.map((role) => role.title),
-              name: "role",
-            },
-            {
-              type: "list",
-              message: "Who is the direct manager? ",
-              choices: mgrList.map((manager) => manager.Manager),
-              name: "manager",
-            },
-          ])
-          .then((answer) => {
-            console.log(answer);
-
-            const newEmployee = {
-              first_name: answer.firstName,
-              last_name: answer.lastName,
-              role_id:
-                roleList[
-                  roleList.findIndex((role) => role.title === answer.role)
-                ].id,
-              manager_id:
-                mgrList[
-                  mgrList.findIndex((mgr) => mgr.Manager === answer.manager)
-                ].id,
-            };
-
-            console.log(Object.values(newEmployee));
-
-            connection.query(
-              `INSERT INTO employee(first_name, last_name, role_id, manager_id)
-              VALUES (?,?,?,?)`,
-              Object.values(newEmployee),
-              (err, results) => {
-                if (err) throw err;
-
-                console.log(
-                  `${newEmployee.first_name} ${
-                    newEmployee.last_name
-                  } has been created with Employee ID: ${
-                    results.insertId
-                  } and a salary of $${roleList[newEmployee.role_id].salary}`
-                );
-
-                menu();
-              }
-            );
-
-            // add employee to DB
-          })
-          .catch((error) => {
-            if (error.isTtyError) {
-              throw new Error(
-                "Prompt couldn't be rendered in the current environment."
-              );
-            } else {
-              throw error;
-            }
-          });
-      });
-    }
-  );
+      menu();
+    })
+    .catch((error) => {
+      inquirerErr(error);
+    });
 }
 
 // update employee roles
 function updateEmployeeRole() {
+  let employeeList, roleList;
+
   // get employeeList
-  connection.query(
-    `SELECT id, CONCAT(first_name,' ', last_name) AS 'Employee'
-    FROM employee;`,
-    (err, employeeList) => {
-      if (err) throw err;
-      connection.query(
-        `SELECT id, title 
-        FROM role;`,
-        (err, roleList) => {
-          if (err) throw err;
-          inquirer
-            .prompt([
-              {
-                type: "list",
-                message: "Which employee would you like to change?",
-                choices: employeeList.map((emp) => emp.Employee),
-                name: "employee",
-              },
-              {
-                type: "list",
-                message: "What is the new role?",
-                choices: roleList.map((role) => role.title),
-                name: "role",
-              },
-            ])
-            .then((answers) => {
-              const empId = {
-                id: employeeList[
-                  employeeList.findIndex(
-                    (emp) => emp.Employee === answers.employee
-                  )
-                ].id,
-              };
-              const roleId = {
-                role_id:
-                  roleList[
-                    roleList.findIndex((role) => role.title === answers.role)
-                  ].id,
-              };
+  Promise.all([sql.getEmployeesAsEmployee(), sql.getRoleList()])
+    .then((lists) => {
+      employeeList = lists[0];
+      roleList = lists[1];
 
-              connection.query(
-                `UPDATE employee SET ? WHERE ?`,
-                [roleId, empId],
-                (err, res) => {
-                  if (err) throw err;
-
-                  console.log(
-                    `${answers.employee} has been updated to the new role ${answers.role}`
-                  );
-
-                  menu();
-                }
-              );
-            })
-            .catch((error) => {
-              if (error.isTtyError) {
-                throw new Error(
-                  "Prompt couldn't be rendered in the current environment."
-                );
-              } else {
-                throw error;
-              }
-            });
-        }
+      return inquirer.prompt([
+        {
+          type: "list",
+          message: "Which employee would you like to change?",
+          choices: employeeList.map((emp) => emp.Employee),
+          name: "employee",
+        },
+        {
+          type: "list",
+          message: "What is the new role?",
+          choices: roleList.map((role) => role.title),
+          name: "role",
+        },
+      ]);
+    })
+    .then((answers) => {
+      const empId = {
+        id: employeeList[
+          employeeList.findIndex((emp) => emp.Employee === answers.employee)
+        ].id,
+      };
+      const roleId = {
+        role_id:
+          roleList[roleList.findIndex((role) => role.title === answers.role)]
+            .id,
+      };
+      return sql.updateEmployee([roleId, empId]).then(() => answers);
+    })
+    .then((answers) => {
+      console.log();
+      console.log(
+        `${answers.employee} has been updated to the new role ${answers.role}`
       );
-    }
-  );
-  // get roleList
-  // ask which employee and role to update
-  // update DB
+      menu();
+    })
+    .catch((error) => {
+      inquirerErr(error);
+    });
 }
 
 // add roles
 function addNewRole() {
+  let departmentList;
   // get departmentList
-  connection.query(`SELECT * FROM department`, (err, departmentList) => {
-    if (err) throw err;
-
-    // question the information
-    inquirer
-      .prompt([
+  sql
+    .getDepartmentList()
+    .then((deptList) => {
+      departmentList = deptList;
+      // question the information
+      return inquirer.prompt([
         {
           type: "input",
           message: "What is the title of the role?",
@@ -442,37 +336,30 @@ function addNewRole() {
           choices: departmentList.map((dept) => dept.name),
           name: "dept",
         },
-      ])
-      .then((answers) => {
-        console.table(departmentList);
-        const newRole = {
-          title: answers.title,
-          salary: answers.salary,
-          department_id:
-            departmentList[
-              departmentList.findIndex((dept) => dept.name === answers.dept)
-            ].id,
-        };
+      ]);
+    })
+    .then((answers) => {
+      const newRole = {
+        title: answers.title,
+        salary: answers.salary,
+        department_id:
+          departmentList[
+            departmentList.findIndex((dept) => dept.name === answers.dept)
+          ].id,
+      };
 
-        // add role to DB
-        connection.query(`INSERT INTO role SET ?`, newRole, (err, res) => {
-          if (err) throw err;
+      // add role to DB
+      return sql.addNewRole(newRole).then(() => newRole);
+    })
+    .then((newRole) => {
+      console.log();
+      console.log(`${newRole.title} has been added as a role.`);
 
-          console.log(`${newRole.title} has been added as a role.`);
-
-          menu();
-        });
-      })
-      .catch((error) => {
-        if (error.isTtyError) {
-          throw new Error(
-            "Prompt couldn't be rendered in the current environment."
-          );
-        } else {
-          throw error;
-        }
-      });
-  });
+      menu();
+    })
+    .catch((error) => {
+      inquirerErr(error);
+    });
 }
 
 // add department
@@ -483,357 +370,248 @@ function addNewDepartment() {
       message: "What is the name of the new department?",
       name: "name",
     })
+    .then((answer) => sql.addNewDepartment(answer).then(() => answer))
     .then((answer) => {
-      console.log(answer);
-      connection.query(`INSERT INTO department SET ?`, answer, (err, res) => {
-        if (err) throw err;
+      console.log(
+        `${answer.name} has been updated.\n\nBe sure to add the roles for this department!\n`
+      );
 
-        console.log(
-          `${answer.name} has been updated.\n\nBe sure to add the roles for this department!\n`
-        );
-
-        menu();
-      });
+      menu();
     })
     .catch((error) => {
-      if (error.isTtyError) {
-        throw new Error(
-          "Prompt couldn't be rendered in the current environment."
-        );
-      } else {
-        throw error;
-      }
+      inquirerErr(error);
     });
 }
 
 /**** bonus ****/
 // view employee by manager
 function viewEmployeesByManager() {
-  // limit list of managers to employees that ARE managers
-  connection.query(
-    `SELECT DISTINCT
-        mgr.id,
-        CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
-    FROM employee emp
-        JOIN employee mgr ON emp.manager_id = mgr.id
-    WHERE emp.manager_id IS NOT NULL
-    ORDER BY mgr.first_name;`,
-    (err, mgrList) => {
-      if (err) throw err;
+  let mgrList;
 
-      // add no choice for the manager to the list
-      mgrList.push({ id: null, Manager: "No direct manager" });
-
-      inquirer
-        .prompt({
-          type: "list",
-          message: "Which manager's employees would you like to view?",
-          choices: mgrList.map((obj) => obj.Manager),
-          name: "choice",
-        })
-        .then((answer) => {
-          const mgrId =
-            mgrList[
-              mgrList.findIndex((manager) => manager.Manager === answer.choice)
-            ].id;
-          connection.query(
-            `SELECT 
-                emp.id AS 'ID',
-                emp.first_name AS 'First Name',
-                emp.last_name AS 'Last Name',
-                role.title AS 'Role',
-                department.name AS 'Department',
-                role.salary AS 'Salary',
-                CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
-            FROM employee emp
-                JOIN role ON role_id = role.id
-                JOIN department ON role.department_id = department.id
-                LEFT JOIN employee mgr ON emp.manager_id = mgr.id
-            WHERE emp.manager_id ${mgrId === null ? "IS NULL" : "= ?"}
-            ORDER BY emp.id;`,
-            [mgrId],
-            (err, res) => {
-              if (err) throw err;
-              console.table(res);
-              menu();
-            }
-          );
-        })
-        .catch((error) => {
-          if (error.isTtyError) {
-            throw new Error(
-              "Prompt couldn't be rendered in the current environment."
-            );
-          } else {
-            throw error;
-          }
-        });
-    }
-  );
+  sql
+    .getOnlyManagersAsManager()
+    .then((managerList) => {
+      mgrList = managerList;
+      return inquirer.prompt({
+        type: "list",
+        message: "Which manager's employees would you like to view?",
+        choices: mgrList.map((obj) => obj.Manager),
+        name: "choice",
+      });
+    })
+    .then((answer) => {
+      const mgrId =
+        mgrList[
+          mgrList.findIndex((manager) => manager.Manager === answer.choice)
+        ].id;
+      return sql.getAllEmployeesData(
+        `WHERE emp.manager_id ${mgrId === null ? "IS NULL" : "= ?"}`,
+        [mgrId]
+      );
+    })
+    .then((res) => {
+      console.table(res);
+      menu();
+    })
+    .catch((error) => {
+      inquirerErr(error);
+    });
 }
 
 // update employee managers
 function updateEmployeeManager() {
+  let employeeList;
+  let managerList;
   // get employee to change
-  connection.query(
-    `SELECT id, CONCAT(first_name, ' ', last_name) AS 'Employee'
-    FROM employee`,
-    (err, employeeList) => {
-      if (err) throw err;
-      // get manager list (Any employee can be a manager) and add no choice for the manager
-      const mgrList = [
-        ...employeeList,
-        { id: null, Employee: "No direct manager" },
-      ];
+  Promise.all([sql.getEmployeesAsEmployee(), sql.getAllEmployeesAsManager()])
+    .then((lists) => {
+      employeeList = lists[0];
+      managerList = lists[1];
 
       // get new information
-      inquirer
-        .prompt([
-          {
-            type: "list",
-            message: "Which employee would you like to change?",
-            choices: employeeList.map((employee) => employee.Employee),
-            name: "employee",
-          },
-          {
-            type: "list",
-            message: "Who is the new manager?",
-            choices: mgrList.map((manager) => manager.Employee),
-            name: "manager",
-          },
-        ])
-        .then((answers) => {
-          const empId = {
-            id: employeeList[
-              employeeList.findIndex(
-                (employee) => employee.Employee === answers.employee
-              )
-            ].id,
-          };
-          const mgrId = {
-            manager_id:
-              mgrList[
-                mgrList.findIndex(
-                  (manager) => manager.Employee === answers.manager
-                )
-              ].id,
-          };
+      return inquirer.prompt([
+        {
+          type: "list",
+          message: "Which employee would you like to change?",
+          choices: employeeList.map((employee) => employee.Employee),
+          name: "employee",
+        },
+        {
+          type: "list",
+          message: "Who is the new manager?",
+          choices: managerList.map((manager) => manager.Manager),
+          name: "manager",
+        },
+      ]);
+    })
+    .then((answers) => {
+      const empId = {
+        id: employeeList[
+          employeeList.findIndex(
+            (employee) => employee.Employee === answers.employee
+          )
+        ].id,
+      };
+      const mgrId = {
+        manager_id:
+          managerList[
+            managerList.findIndex(
+              (manager) => manager.Manager === answers.manager
+            )
+          ].id,
+      };
 
-          // console.log("empId:", empId, "\nmgrId:", mgrId);
-          connection.query(
-            `UPDATE employee SET ? WHERE ?`,
-            [mgrId, empId],
-            (err, res) => {
-              if (err) throw err;
+      return sql.updateEmployee([mgrId, empId]).then(() => answers);
+    })
+    .then((answers) => {
+      console.log();
+      console.log(
+        `${answers.employee} has been updated to have ${answers.manager} as their manager.`
+      );
 
-              console.log(
-                `${answers.employee} has been updated to have ${answers.manager} as their manager.`
-              );
-
-              menu();
-            }
-          );
-        })
-        .catch((error) => {
-          if (error.isTtyError) {
-            throw new Error(
-              "Prompt couldn't be rendered in the current environment."
-            );
-          } else {
-            throw error;
-          }
-        });
-    }
-  );
-  // update employee
+      menu();
+    })
+    .catch((error) => {
+      inquirerErr(error);
+    });
 }
 
 // delete employees
 function removeEmployee() {
-  connection.query(
-    `SELECT id, CONCAT(first_name, " ",last_name) AS 'Employee'
-    FROM employee;`,
-    (err, employeeList) => {
-      if (err) throw err;
+  let employeeList;
 
-      inquirer
-        .prompt({
-          type: "list",
-          message: "Which employee would you like to remove? ",
-          choices: employeeList.map((emp) => emp.Employee),
-          name: "employee",
-        })
-        .then((answer) => {
-          if (err) throw err;
+  sql
+    .getEmployeesAsEmployee()
+    .then((empList) => {
+      employeeList = empList;
+      return inquirer.prompt({
+        type: "list",
+        message: "Which employee would you like to remove? ",
+        choices: employeeList.map((emp) => emp.Employee),
+        name: "employee",
+      });
+    })
+    .then((answer) => {
+      const empId =
+        employeeList[
+          employeeList.findIndex((emp) => emp.Employee === answer.employee)
+        ].id;
+      return sql.deleteEmployee(empId).then(() => answer);
+    })
+    .then((answer) => {
+      console.log();
+      console.log(`${answer.employee} has been removed.`);
 
-          const empId =
-            employeeList[
-              employeeList.findIndex((emp) => emp.Employee === answer.employee)
-            ].id;
-
-          connection.query(
-            `DELETE FROM employee WHERE id = ?`,
-            [empId],
-            (err, res) => {
-              if (err) throw err;
-
-              console.log(`${answer.employee} has been removed.`);
-
-              menu();
-            }
-          );
-        })
-        .catch((error) => {
-          if (error.isTtyError) {
-            throw new Error(
-              "Prompt couldn't be rendered in the current environment."
-            );
-          } else {
-            throw error;
-          }
-        });
-    }
-  );
+      menu();
+    })
+    .catch((error) => {
+      inquirerErr(error);
+    });
 }
 
 // delete roles
 //TODO: add list of employees now stranded without roles or verify no Employees have role being deleted
 function removeRole() {
-  connection.query(`SELECT * FROM role;`, (err, roleList) => {
-    if (err) throw err;
+  let roleList;
 
-    inquirer
-      .prompt({
+  sql
+    .getRoleList()
+    .then((list) => {
+      roleList = list;
+      return inquirer.prompt({
         type: "list",
         message: "Which role would you like to delete?",
         choices: roleList.map((role) => role.title),
         name: "role",
-      })
-      .then((answer) => {
-        const roleId =
-          roleList[roleList.findIndex((role) => role.title === answer.role)].id;
-
-        connection.query(
-          `DELETE FROM role WHERE id = ?`,
-          [roleId],
-          (err, res) => {
-            if (err) throw err;
-
-            console.log(`${answer.role} has been removed.`);
-
-            menu();
-          }
-        );
-      })
-      .catch((error) => {
-        if (error.isTtyError) {
-          throw new Error(
-            "Prompt couldn't be rendered in the current environment."
-          );
-        } else {
-          throw error;
-        }
       });
-  });
+    })
+    .then((answer) => {
+      const roleId =
+        roleList[roleList.findIndex((role) => role.title === answer.role)].id;
+
+      return sql.deleteRole(roleId).then(() => answer);
+    })
+    .then((answer) => {
+      console.log();
+      console.log(`${answer.role} has been removed.`);
+
+      menu();
+    })
+    .catch((error) => {
+      inquirerErr(error);
+    });
 }
 
 // delete department
 //TODO: add list of employees and roles now stranded without department or verify no Employees/Roles have department being deleted
 function removeDepartment() {
-  connection.query(`SELECT * FROM department`, (err, departmentList) => {
-    if (err) throw err;
+  let departmentList;
 
-    inquirer
-      .prompt({
+  sql
+    .getDepartmentList()
+    .then((deptList) => {
+      departmentList = deptList;
+
+      return inquirer.prompt({
         type: "list",
         message: "Which department would you like to remove?",
         choices: departmentList.map((dept) => dept.name),
         name: "dept",
-      })
-      .then((answer) => {
-        deptId =
-          departmentList[
-            departmentList.findIndex((dept) => dept.name === answer.dept)
-          ].id;
-
-        connection.query(
-          `DELETE FROM department WHERE id = ?`,
-          [deptId],
-          (err, res) => {
-            if (err) throw err;
-
-            console.log(`${answer.dept} has been removed.`);
-
-            menu();
-          }
-        );
-      })
-      .catch((error) => {
-        if (error.isTtyError) {
-          throw new Error(
-            "Prompt couldn't be rendered in the current environment."
-          );
-        } else {
-          throw error;
-        }
       });
-  });
+    })
+    .then((answer) => {
+      deptId =
+        departmentList[
+          departmentList.findIndex((dept) => dept.name === answer.dept)
+        ].id;
+
+      return sql.deleteDepartment(deptId).then(() => answer);
+    })
+    .then((answer) => {
+      console.log();
+      console.log(`${answer.dept} has been removed.`);
+
+      menu();
+    })
+    .catch((error) => {
+      inquirerErr(error);
+    });
 }
 
 // View the total utilized budget of a department -- ie the combined salaries of all employees in that department
 function viewDepartmentBudget() {
-  connection.query(`SELECT * FROM department`, (err, departmentList) => {
-    if (err) throw err;
+  let departmentList;
 
-    inquirer
-      .prompt({
+  sql
+    .getDepartmentList()
+    .then((deptList) => {
+      departmentList = deptList;
+      return inquirer.prompt({
         type: "list",
         message: "Which department's budget would you like to see?",
         choices: departmentList.map((dept) => dept.name),
         name: "dept",
-      })
-      .then((answer) => {
-        deptId =
-          departmentList[
-            departmentList.findIndex((dept) => dept.name === answer.dept)
-          ].id;
-
-        connection.query(
-          `SELECT SUM(salary) AS 'Budget'
-          FROM role
-              JOIN employee ON role.id = employee.role_id
-              JOIN department ON role.department_id = department.id 
-          WHERE department_id = ?;`,
-          [deptId],
-          (err, budget) => {
-            if (err) throw err;
-
-            const budgetAmt = budget[0].Budget || 0;
-            console.log(`The budget for ${answer.dept} is $${budgetAmt}.`);
-
-            menu();
-          }
-        );
-
-        console.log();
-      })
-      .catch((error) => {
-        if (error.isTtyError) {
-          throw new Error(
-            "Prompt couldn't be rendered in the current environment."
-          );
-        } else {
-          throw error;
-        }
       });
-  });
+    })
+    .then((answer) => {
+      deptId =
+        departmentList[
+          departmentList.findIndex((dept) => dept.name === answer.dept)
+        ].id;
+
+      return sql.getDepartmentBudget().then((budget) => {
+        return { budget: budget, answer: answer };
+      });
+    })
+    .then(({ budget, answer }) => {
+      const budgetAmt = budget[0].Budget || 0;
+
+      console.log();
+      console.log(`The budget for ${answer.dept} is $${budgetAmt}.`);
+
+      menu();
+    })
+    .catch((error) => {
+      inquirerErr(error);
+    });
 }
-
-// make db connection
-connection.connect((err) => {
-  if (err) throw err;
-  console.log(`connected as is ${connection.threadId}\n`);
-
-  showStartScreen();
-  menu();
-});
