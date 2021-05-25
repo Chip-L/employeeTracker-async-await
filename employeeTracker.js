@@ -62,6 +62,34 @@ const getRoleList = new Promise((resolve, reject) => {
   });
 });
 
+const getAllEmployeesAsManager = new Promise((resolve, reject) => {
+  const query = `SELECT 
+        id,
+        CONCAT(first_name, ' ', last_name) AS 'Manager'
+    FROM employee
+    ORDER BY id;`;
+
+  connection.query(query, (err, mgrList) => {
+    if (err) reject(err);
+
+    // add no choice for the manager to the list
+    mgrList.push({ id: null, Manager: "No direct manager" });
+    resolve(mgrList);
+  });
+});
+
+const setNewEmployee = (newEmployee) => {
+  return new Promise((resolve, reject) => {
+    const query = `INSERT INTO employee(first_name, last_name, role_id, manager_id) VALUES (?,?,?,?)`;
+
+    connection.query(query, Object.values(newEmployee), (err, results) => {
+      if (err) reject(err);
+      // console.log("in promise: ", results);
+      resolve({ results: results, newEmployee: newEmployee });
+    });
+  });
+};
+
 /*** util functions ***/
 // recommended test for inquirer errors from https://www.npmjs.com/package/inquirer
 const inquirerErr = (error) => {
@@ -230,96 +258,73 @@ function viewEmployeesByRole() {
 
 // add employees
 function addEmployee() {
+  // set these variables so they are accessible throughout the chain
+  let mgrList, roleList;
+
   // get manager list (Any employee can be a manager)
-  connection.query(
-    `SELECT 
-        id,
-        CONCAT(first_name, ' ', last_name) AS 'Manager'
-    FROM employee
-    ORDER BY id;`,
-    (err, mgrList) => {
-      if (err) throw err;
+  // get roleList -- these are done in parallel
+  Promise.all([getAllEmployeesAsManager, getRoleList])
+    .then((lists) => {
+      mgrList = lists[0];
+      roleList = lists[1];
 
-      // add no choice for the manager to the list
-      mgrList.push({ id: null, Manager: "No direct manager" });
+      // get employee information (first name, last name, manager, role (department is not needed as it is tied to role))
+      return inquirer.prompt([
+        {
+          type: "input",
+          message: "Employee's first name: ",
+          name: "firstName",
+          validate: (firstName) => /^[a-zA-Z]+( [a-zA-Z]*)*$/.test(firstName),
+        },
+        {
+          type: "input",
+          message: "Employee's last name: ",
+          name: "lastName",
+          validate: (lastName) => /^[a-zA-Z]+( [a-zA-Z]*)*$/.test(lastName),
+        },
+        {
+          type: "list",
+          message: "What is the employee's role? ",
+          choices: roleList.map((role) => role.title),
+          name: "role",
+        },
+        {
+          type: "list",
+          message: "Who is the direct manager? ",
+          choices: mgrList.map((manager) => manager.Manager),
+          name: "manager",
+        },
+      ]);
+    })
+    .then((answer) => {
+      const newEmployee = {
+        first_name: answer.firstName,
+        last_name: answer.lastName,
+        role_id:
+          roleList[roleList.findIndex((role) => role.title === answer.role)].id,
+        manager_id:
+          mgrList[mgrList.findIndex((mgr) => mgr.Manager === answer.manager)]
+            .id,
+      };
+      return newEmployee;
+    })
+    // add employee to DB
+    .then((newEmployee) => setNewEmployee(newEmployee))
+    .then(({ results, newEmployee }) => {
+      console.log();
+      console.log(
+        `${newEmployee.first_name} ${
+          newEmployee.last_name
+        } has been created with Employee ID: ${
+          results.insertId
+        } and a salary of $${roleList[newEmployee.role_id].salary}.`
+      );
 
-      // get list of roles
-      connection.query("SELECT * FROM role;", (err, roleList) => {
-        if (err) throw err;
-
-        // get employee information (first name, last name, manager, role (department is not needed as it is tied to role))
-        inquirer
-          .prompt([
-            {
-              type: "input",
-              message: "Employee's first name: ",
-              name: "firstName",
-              validate: (firstName) =>
-                /^[a-zA-Z]+( [a-zA-Z]*)*$/.test(firstName),
-            },
-            {
-              type: "input",
-              message: "Employee's last name: ",
-              name: "lastName",
-              validate: (lastName) => /^[a-zA-Z]+( [a-zA-Z]*)*$/.test(lastName),
-            },
-            {
-              type: "list",
-              message: "What is the employee's role? ",
-              choices: roleList.map((role) => role.title),
-              name: "role",
-            },
-            {
-              type: "list",
-              message: "Who is the direct manager? ",
-              choices: mgrList.map((manager) => manager.Manager),
-              name: "manager",
-            },
-          ])
-          .then((answer) => {
-            console.log(answer);
-
-            const newEmployee = {
-              first_name: answer.firstName,
-              last_name: answer.lastName,
-              role_id:
-                roleList[
-                  roleList.findIndex((role) => role.title === answer.role)
-                ].id,
-              manager_id:
-                mgrList[
-                  mgrList.findIndex((mgr) => mgr.Manager === answer.manager)
-                ].id,
-            };
-
-            // console.log(Object.values(newEmployee));
-
-            // add employee to DB
-            connection.query(
-              `INSERT INTO employee(first_name, last_name, role_id, manager_id)
-              VALUES (?,?,?,?)`,
-              Object.values(newEmployee),
-              (err, results) => {
-                if (err) throw err;
-
-                console.log(
-                  `${newEmployee.first_name} ${
-                    newEmployee.last_name
-                  } has been created with Employee ID: ${
-                    results.insertId
-                  } and a salary of $${roleList[newEmployee.role_id].salary}`
-                );
-
-                menu();
-              }
-            );
-          })
-          .catch((error) => {
-            inquirerErr(error);
-          });
-      });
-    }
-  );
+      menu();
+    })
+    .catch((error) => {
+      inquirerErr(error);
+    });
 }
 
 // update employee roles
