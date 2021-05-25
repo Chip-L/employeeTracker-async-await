@@ -114,6 +114,20 @@ const getOnlyManagersAsManagerSQL = () =>
     });
   });
 
+const getDepartmentBudgetSQL = () =>
+  new Promise((resolve, reject) => {
+    const query = `SELECT SUM(salary) AS 'Budget'
+    FROM role
+        JOIN employee ON role.id = employee.role_id
+        JOIN department ON role.department_id = department.id 
+    WHERE department_id = ?;`;
+
+    connection.query(query, [deptId], (err, budget) => {
+      if (err) reject(err);
+      resolve(budget);
+    });
+  });
+
 const addNewEmployeeSQL = (newEmployee) =>
   new Promise((resolve, reject) => {
     const query = `INSERT INTO employee(first_name, last_name, role_id, manager_id) VALUES (?,?,?,?)`;
@@ -209,6 +223,7 @@ const showStartScreen = () => {
 
 // get options
 function menu() {
+  console.log();
   inquirer
     .prompt([
       {
@@ -735,43 +750,37 @@ function removeDepartment() {
 
 // View the total utilized budget of a department -- ie the combined salaries of all employees in that department
 function viewDepartmentBudget() {
-  connection.query(`SELECT * FROM department`, (err, departmentList) => {
-    if (err) throw err;
+  let departmentList;
 
-    inquirer
-      .prompt({
+  getDepartmentListSQL()
+    .then((deptList) => {
+      departmentList = deptList;
+      return inquirer.prompt({
         type: "list",
         message: "Which department's budget would you like to see?",
         choices: departmentList.map((dept) => dept.name),
         name: "dept",
-      })
-      .then((answer) => {
-        deptId =
-          departmentList[
-            departmentList.findIndex((dept) => dept.name === answer.dept)
-          ].id;
-
-        connection.query(
-          `SELECT SUM(salary) AS 'Budget'
-          FROM role
-              JOIN employee ON role.id = employee.role_id
-              JOIN department ON role.department_id = department.id 
-          WHERE department_id = ?;`,
-          [deptId],
-          (err, budget) => {
-            if (err) throw err;
-
-            const budgetAmt = budget[0].Budget || 0;
-            console.log(`The budget for ${answer.dept} is $${budgetAmt}.`);
-
-            menu();
-          }
-        );
-
-        console.log();
-      })
-      .catch((error) => {
-        inquirerErr(error);
       });
-  });
+    })
+    .then((answer) => {
+      deptId =
+        departmentList[
+          departmentList.findIndex((dept) => dept.name === answer.dept)
+        ].id;
+
+      return getDepartmentBudgetSQL().then((budget) => {
+        return { budget: budget, answer: answer };
+      });
+    })
+    .then(({ budget, answer }) => {
+      const budgetAmt = budget[0].Budget || 0;
+
+      console.log();
+      console.log(`The budget for ${answer.dept} is $${budgetAmt}.`);
+
+      menu();
+    })
+    .catch((error) => {
+      inquirerErr(error);
+    });
 }
