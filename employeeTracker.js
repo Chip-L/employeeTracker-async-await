@@ -12,6 +12,49 @@ const connection = mysql.createConnection({
   database: process.env.DB_NAME,
 });
 
+// make db connection
+connection.connect((err) => {
+  if (err) throw err;
+  console.log(`connected as is ${connection.threadId}\n`);
+
+  showStartScreen();
+  menu();
+});
+
+/***  queries as promise objects ***/
+
+// returns promise of all employees -- where and matches are optional for filtering (where is the WHERE clause and matches are the objects in an array to be matched)
+const getAllEmployees = (where, matches) => {
+  return new Promise((resolve, reject) => {
+    const query = `SELECT 
+        emp.id AS 'ID',
+        emp.first_name AS 'First Name',
+        emp.last_name AS 'Last Name',
+        role.title AS 'Title',
+        department.name as 'Department',
+        role.salary AS 'Salary',
+        CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
+    FROM employee emp
+      JOIN role ON role_id = role.id
+      JOIN department ON role.department_id = department.id
+      LEFT JOIN employee mgr ON emp.manager_id = mgr.id
+    ${!where ? "" : where}
+    ORDER BY emp.id;`;
+    connection.query(query, matches, (err, res) => {
+      if (err) reject(err);
+      resolve(res);
+    });
+  });
+};
+
+const getDepartmentList = new Promise((resolve, reject) => {
+  const query = "SELECT * FROM department;";
+  connection.query(query, (err, deptList) => {
+    if (err) reject(err);
+    resolve(deptList);
+  });
+});
+
 const showStartScreen = () => {
   console.log(",---------------------------------------------------.");
   console.log("|   _____                 _                         |");
@@ -123,63 +166,33 @@ function menu() {
 
 // view all employees
 function viewAllEmployees() {
-  connection.query(
-    `SELECT 
-        emp.id AS 'ID',
-        emp.first_name AS 'First Name',
-        emp.last_name AS 'Last Name',
-        role.title AS 'Title',
-        department.name as 'Department',
-        role.salary AS 'Salary',
-        CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
-    FROM employee emp
-      JOIN role ON role_id = role.id
-      JOIN department ON role.department_id = department.id
-      LEFT JOIN employee mgr ON emp.manager_id = mgr.id
-    ORDER BY emp.id;`,
-    (err, res) => {
-      if (err) throw err;
-      console.log();
-      console.table(res);
-      menu();
-    }
-  );
+  getAllEmployees().then((res) => {
+    console.log();
+    console.table(res);
+    menu();
+  });
 }
 
 // view employees by department
 function viewEmployeesByDepartment() {
-  connection.query("SELECT * FROM department;", (err, deptList) => {
-    if (err) throw err;
+  getDepartmentList.then((deptList) => {
     inquirer
       .prompt({
         type: "list",
         message: "Which department would you like to view?",
-        choices: deptList.map((obj) => obj.name),
+        choices: deptList.map((dept) => dept.name),
         name: "choice",
       })
       .then((answer) => {
-        connection.query(
-          `SELECT 
-              emp.id AS 'ID',
-              emp.first_name AS 'First Name',
-              emp.last_name AS 'Last Name',
-              role.title AS 'Role',
-              department.name AS 'Department',
-              role.salary AS 'Salary',
-              CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
-          FROM employee emp
-              JOIN role ON role_id = role.id
-              JOIN department ON role.department_id = department.id
-              LEFT JOIN employee mgr ON emp.manager_id = mgr.id
-          WHERE department.name = ?
-          ORDER BY emp.id;`,
-          [answer.choice],
-          (err, employeeList) => {
-            if (err) throw err;
-            console.table(employeeList);
+        getAllEmployees("WHERE ?", [{ name: answer.choice }])
+          .then((res) => {
+            console.log();
+            console.table(res);
             menu();
-          }
-        );
+          })
+          .catch((err) => {
+            throw err;
+          });
       })
       .catch((error) => {
         if (error.isTtyError) {
@@ -828,12 +841,3 @@ function viewDepartmentBudget() {
       });
   });
 }
-
-// make db connection
-connection.connect((err) => {
-  if (err) throw err;
-  console.log(`connected as is ${connection.threadId}\n`);
-
-  showStartScreen();
-  menu();
-});
