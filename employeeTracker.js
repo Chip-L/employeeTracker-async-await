@@ -149,6 +149,15 @@ const updateEmployeeSQL = (newValues) =>
     });
   });
 
+const deleteEmployeeSQL = (empId) =>
+  new Promise((resolve, reject) => {
+    connection.query(`DELETE FROM employee WHERE id = ?`, empId, (err, res) => {
+      if (err) reject(err);
+      console.log(res);
+      resolve(res);
+    });
+  });
+
 /*** util functions ***/
 // recommended test for inquirer errors from https://www.npmjs.com/package/inquirer
 const inquirerErr = (error) => {
@@ -608,44 +617,34 @@ function updateEmployeeManager() {
 
 // delete employees
 function removeEmployee() {
-  connection.query(
-    `SELECT id, CONCAT(first_name, " ",last_name) AS 'Employee'
-    FROM employee;`,
-    (err, employeeList) => {
-      if (err) throw err;
+  let employeeList;
 
-      inquirer
-        .prompt({
-          type: "list",
-          message: "Which employee would you like to remove? ",
-          choices: employeeList.map((emp) => emp.Employee),
-          name: "employee",
-        })
-        .then((answer) => {
-          if (err) throw err;
+  getEmployeesAsEmployeeSQL()
+    .then((empList) => {
+      employeeList = empList;
+      return inquirer.prompt({
+        type: "list",
+        message: "Which employee would you like to remove? ",
+        choices: employeeList.map((emp) => emp.Employee),
+        name: "employee",
+      });
+    })
+    .then((answer) => {
+      const empId =
+        employeeList[
+          employeeList.findIndex((emp) => emp.Employee === answer.employee)
+        ].id;
+      return deleteEmployeeSQL(empId).then(() => answer);
+    })
+    .then((answer) => {
+      console.log();
+      console.log(`${answer.employee} has been removed.`);
 
-          const empId =
-            employeeList[
-              employeeList.findIndex((emp) => emp.Employee === answer.employee)
-            ].id;
-
-          connection.query(
-            `DELETE FROM employee WHERE id = ?`,
-            [empId],
-            (err, res) => {
-              if (err) throw err;
-
-              console.log(`${answer.employee} has been removed.`);
-
-              menu();
-            }
-          );
-        })
-        .catch((error) => {
-          inquirerErr(error);
-        });
-    }
-  );
+      menu();
+    })
+    .catch((error) => {
+      inquirerErr(error);
+    });
 }
 
 // delete roles
