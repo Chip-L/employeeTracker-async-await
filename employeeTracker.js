@@ -102,6 +102,15 @@ const addNewEmployeeSQL = (newEmployee) => {
   });
 };
 
+const addNewRoleSQL = (newRole) => {
+  return new Promise((resolve, reject) => {
+    connection.query(`INSERT INTO role SET ?`, newRole, (err, res) => {
+      if (err) throw err;
+      resolve(res);
+    });
+  });
+};
+
 const updateEmployeeSQL = (newValues) => {
   return new Promise((resolve, reject) => {
     connection.query(`UPDATE employee SET ? WHERE ?`, newValues, (err, res) => {
@@ -121,6 +130,7 @@ const inquirerErr = (error) => {
   }
 };
 
+/*** Start program execution ***/
 const showStartScreen = () => {
   console.log(",---------------------------------------------------.");
   console.log("|   _____                 _                         |");
@@ -404,13 +414,13 @@ function updateEmployeeRole() {
 
 // add roles
 function addNewRole() {
+  let departmentList;
   // get departmentList
-  connection.query(`SELECT * FROM department`, (err, departmentList) => {
-    if (err) throw err;
-
-    // question the information
-    inquirer
-      .prompt([
+  getDepartmentListSQL
+    .then((deptList) => {
+      departmentList = deptList;
+      // question the information
+      return inquirer.prompt([
         {
           type: "input",
           message: "What is the title of the role?",
@@ -428,31 +438,31 @@ function addNewRole() {
           choices: departmentList.map((dept) => dept.name),
           name: "dept",
         },
-      ])
-      .then((answers) => {
-        console.table(departmentList);
-        const newRole = {
-          title: answers.title,
-          salary: answers.salary,
-          department_id:
-            departmentList[
-              departmentList.findIndex((dept) => dept.name === answers.dept)
-            ].id,
-        };
+      ]);
+    })
+    .then((answers) => {
+      // console.table(departmentList);
+      const newRole = {
+        title: answers.title,
+        salary: answers.salary,
+        department_id:
+          departmentList[
+            departmentList.findIndex((dept) => dept.name === answers.dept)
+          ].id,
+      };
 
-        // add role to DB
-        connection.query(`INSERT INTO role SET ?`, newRole, (err, res) => {
-          if (err) throw err;
+      // add role to DB
+      return addNewRoleSQL(newRole).then(() => newRole);
+    })
+    .then((newRole) => {
+      console.log();
+      console.log(`${newRole.title} has been added as a role.`);
 
-          console.log(`${newRole.title} has been added as a role.`);
-
-          menu();
-        });
-      })
-      .catch((error) => {
-        inquirerErr(error);
-      });
-  });
+      menu();
+    })
+    .catch((error) => {
+      inquirerErr(error);
+    });
 }
 
 // add department
