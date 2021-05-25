@@ -343,24 +343,24 @@ async function addNewRole() {
 }
 
 // add department
-function addNewDepartment() {
-  inquirer
-    .prompt({
+async function addNewDepartment() {
+  try {
+    const answer = await inquirer.prompt({
       type: "input",
       message: "What is the name of the new department?",
       name: "name",
-    })
-    .then((answer) => sql.addNewDepartment(answer).then(() => answer))
-    .then((answer) => {
-      console.log(
-        `${answer.name} has been updated.\n\nBe sure to add the roles for this department!\n`
-      );
-
-      menu();
-    })
-    .catch((error) => {
-      inquirerErr(error);
     });
+
+    await sql.addNewDepartment(answer);
+
+    console.log();
+    console.log(
+      `${answer.name} has been updated.\n\nBe sure to add the roles for this department!\n`
+    );
+    menu();
+  } catch (error) {
+    inquirerErr(error);
+  }
 }
 
 /**** bonus ****/
