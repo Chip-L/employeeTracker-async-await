@@ -40,6 +40,7 @@ const showStartScreen = () => {
   console.log("|  |_|  |_|\\__,_|_| |_|\\__,_|\\__, |\\___|_|          |");
   console.log("|                            |___/                  |");
   console.log("|                                                   |");
+  console.log("|                            Now with Async/Await!  |");
   console.log("`---------------------------------------------------'");
   console.log();
 };
