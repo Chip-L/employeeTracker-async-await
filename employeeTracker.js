@@ -55,6 +55,13 @@ const getDepartmentList = new Promise((resolve, reject) => {
   });
 });
 
+const getRoleList = new Promise((resolve, reject) => {
+  connection.query("SELECT * FROM role;", (err, roleList) => {
+    if (err) reject(err);
+    resolve(roleList);
+  });
+});
+
 /*** util functions ***/
 // recommended test for inquirer errors from https://www.npmjs.com/package/inquirer
 const inquirerErr = (error) => {
@@ -201,43 +208,24 @@ function viewEmployeesByDepartment() {
 
 // view employees by roles
 function viewEmployeesByRole() {
-  connection.query("SELECT * FROM role;", (err, roleList) => {
-    if (err) throw err;
-    inquirer
-      .prompt({
+  getRoleList
+    .then((roleList) =>
+      inquirer.prompt({
         type: "list",
         message: "Which employee role would you like to view?",
         choices: roleList.map((obj) => obj.title),
         name: "choice",
       })
-      .then((answer) => {
-        connection.query(
-          `SELECT 
-              emp.id AS 'ID',
-              emp.first_name AS 'First Name',
-              emp.last_name AS 'Last Name',
-              role.title AS 'Role',
-              department.name AS 'Department',
-              role.salary AS 'Salary',
-              CONCAT(mgr.first_name, ' ', mgr.last_name) AS 'Manager'
-          FROM employee emp
-              JOIN role ON role_id = role.id
-              JOIN department ON role.department_id = department.id
-              LEFT JOIN employee mgr ON emp.manager_id = mgr.id
-          WHERE role.title = ?
-          ORDER BY emp.id;`,
-          [answer.choice],
-          (err, employeeList) => {
-            if (err) throw err;
-            console.table(employeeList);
-            menu();
-          }
-        );
-      })
-      .catch((error) => {
-        inquirerErr(error);
-      });
-  });
+    )
+    .then((answer) => getAllEmployees("WHERE ?", [{ title: answer.choice }]))
+    .then((employeeList) => {
+      console.log();
+      console.table(employeeList);
+      menu();
+    })
+    .catch((error) => {
+      inquirerErr(error);
+    });
 }
 
 // add employees
