@@ -365,95 +365,79 @@ async function addNewDepartment() {
 
 /**** bonus ****/
 // view employee by manager
-function viewEmployeesByManager() {
-  let mgrList;
-
-  sql
-    .getOnlyManagersAsManager()
-    .then((managerList) => {
-      mgrList = managerList;
-      return inquirer.prompt({
-        type: "list",
-        message: "Which manager's employees would you like to view?",
-        choices: mgrList.map((obj) => obj.Manager),
-        name: "choice",
-      });
-    })
-    .then((answer) => {
-      const mgrId =
-        mgrList[
-          mgrList.findIndex((manager) => manager.Manager === answer.choice)
-        ].id;
-      return sql.getAllEmployeesData(
-        `WHERE emp.manager_id ${mgrId === null ? "IS NULL" : "= ?"}`,
-        [mgrId]
-      );
-    })
-    .then((res) => {
-      console.table(res);
-      menu();
-    })
-    .catch((error) => {
-      inquirerErr(error);
+async function viewEmployeesByManager() {
+  try {
+    const mgrList = await sql.getOnlyManagersAsManager();
+    const answer = await inquirer.prompt({
+      type: "list",
+      message: "Which manager's employees would you like to view?",
+      choices: mgrList.map((obj) => obj.Manager),
+      name: "choice",
     });
+
+    const mgrId =
+      mgrList[mgrList.findIndex((manager) => manager.Manager === answer.choice)]
+        .id;
+    const res = await sql.getAllEmployeesData(
+      `WHERE emp.manager_id ${mgrId === null ? "IS NULL" : "= ?"}`,
+      [mgrId]
+    );
+
+    console.log();
+    console.table(res);
+    menu();
+  } catch (error) {
+    inquirerErr(error);
+  }
 }
 
 // update employee managers
 function updateEmployeeManager() {
-  let employeeList;
-  let managerList;
-  // get employee to change
-  Promise.all([sql.getEmployeesAsEmployee(), sql.getAllEmployeesAsManager()])
-    .then((lists) => {
-      employeeList = lists[0];
-      managerList = lists[1];
+  try {
+    const [employeeList, managerList] = await Promise.all([
+      sql.getEmployeesAsEmployee(),
+      sql.getAllEmployeesAsManager(),
+    ]);
 
-      // get new information
-      return inquirer.prompt([
-        {
-          type: "list",
-          message: "Which employee would you like to change?",
-          choices: employeeList.map((employee) => employee.Employee),
-          name: "employee",
-        },
-        {
-          type: "list",
-          message: "Who is the new manager?",
-          choices: managerList.map((manager) => manager.Manager),
-          name: "manager",
-        },
-      ]);
-    })
-    .then((answers) => {
-      const empId = {
-        id: employeeList[
-          employeeList.findIndex(
-            (employee) => employee.Employee === answers.employee
-          )
+    // get employee to change
+    const answer = inquirer.prompt([
+      {
+        type: "list",
+        message: "Which employee would you like to change?",
+        choices: employeeList.map((employee) => employee.Employee),
+        name: "employee",
+      },
+      {
+        type: "list",
+        message: "Who is the new manager?",
+        choices: managerList.map((manager) => manager.Manager),
+        name: "manager",
+      },
+    ]);
+
+    const empId = {
+      id: employeeList[
+        employeeList.findIndex(
+          (employee) => employee.Employee === answer.employee
+        )
+      ].id,
+    };
+    const mgrId = {
+      manager_id:
+        managerList[
+          managerList.findIndex((manager) => manager.Manager === answer.manager)
         ].id,
-      };
-      const mgrId = {
-        manager_id:
-          managerList[
-            managerList.findIndex(
-              (manager) => manager.Manager === answers.manager
-            )
-          ].id,
-      };
+    };
+    await sql.updateEmployee([mgrId, empId]);
 
-      return sql.updateEmployee([mgrId, empId]).then(() => answers);
-    })
-    .then((answers) => {
-      console.log();
-      console.log(
-        `${answers.employee} has been updated to have ${answers.manager} as their manager.`
-      );
-
-      menu();
-    })
-    .catch((error) => {
-      inquirerErr(error);
-    });
+    console.log();
+    console.log(
+      `${answers.employee} has been updated to have ${answers.manager} as their manager.`
+    );
+    menu();
+  } catch (error) {
+    inquirerErr(error);
+  }
 }
 
 // delete employees
