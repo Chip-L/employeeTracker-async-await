@@ -469,71 +469,56 @@ async function removeEmployee() {
 
 // delete roles
 //TODO: add list of employees now stranded without roles or verify no Employees have role being deleted
-function removeRole() {
-  let roleList;
-
-  sql
-    .getRoleList()
-    .then((list) => {
-      roleList = list;
-      return inquirer.prompt({
-        type: "list",
-        message: "Which role would you like to delete?",
-        choices: roleList.map((role) => role.title),
-        name: "role",
-      });
-    })
-    .then((answer) => {
-      const roleId =
-        roleList[roleList.findIndex((role) => role.title === answer.role)].id;
-
-      return sql.deleteRole(roleId).then(() => answer);
-    })
-    .then((answer) => {
-      console.log();
-      console.log(`${answer.role} has been removed.`);
-
-      menu();
-    })
-    .catch((error) => {
-      inquirerErr(error);
+async function removeRole() {
+  try {
+    const roleList = await sql.getRoleList();
+    const answer = await inquirer.prompt({
+      type: "list",
+      message: "Which role would you like to delete?",
+      choices: roleList.map((role) => role.title),
+      name: "role",
     });
+
+    const roleId =
+      roleList[roleList.findIndex((role) => role.title === answer.role)].id;
+
+    await sql.deleteRole(roleId);
+
+    console.log();
+    console.log(`${answer.role} has been removed.`);
+
+    menu();
+  } catch (error) {
+    inquirerErr(error);
+  }
 }
 
 // delete department
 //TODO: add list of employees and roles now stranded without department or verify no Employees/Roles have department being deleted
-function removeDepartment() {
-  let departmentList;
-
-  sql
-    .getDepartmentList()
-    .then((deptList) => {
-      departmentList = deptList;
-
-      return inquirer.prompt({
-        type: "list",
-        message: "Which department would you like to remove?",
-        choices: departmentList.map((dept) => dept.name),
-        name: "dept",
-      });
-    })
-    .then((answer) => {
-      deptId =
-        departmentList[
-          departmentList.findIndex((dept) => dept.name === answer.dept)
-        ].id;
-
-      return sql.deleteDepartment(deptId).then(() => answer);
-    })
-    .then((answer) => {
-      console.log();
-      console.log(`${answer.dept} has been removed.`);
-
-      menu();
-    })
-    .catch((error) => {
-      inquirerErr(error);
+async function removeDepartment() {
+  try {
+    const departmentList = await sql.getDepartmentList();
+    const answer = await inquirer.prompt({
+      type: "list",
+      message: "Which department would you like to remove?",
+      choices: departmentList.map((dept) => dept.name),
+      name: "dept",
     });
+
+    const deptId =
+      departmentList[
+        departmentList.findIndex((dept) => dept.name === answer.dept)
+      ].id;
+
+    await sql.deleteDepartment(deptId);
+
+    console.log();
+    console.log(`${answer.dept} has been removed.`);
+
+    menu();
+  } catch (error) {
+    inquirerErr(error);
+  }
 }
 
 // View the total utilized budget of a department -- ie the combined salaries of all employees in that department
