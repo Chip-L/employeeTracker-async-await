@@ -392,7 +392,7 @@ async function viewEmployeesByManager() {
 }
 
 // update employee managers
-function updateEmployeeManager() {
+async function updateEmployeeManager() {
   try {
     const [employeeList, managerList] = await Promise.all([
       sql.getEmployeesAsEmployee(),
@@ -400,7 +400,7 @@ function updateEmployeeManager() {
     ]);
 
     // get employee to change
-    const answer = inquirer.prompt([
+    const answer = await inquirer.prompt([
       {
         type: "list",
         message: "Which employee would you like to change?",
@@ -432,7 +432,7 @@ function updateEmployeeManager() {
 
     console.log();
     console.log(
-      `${answers.employee} has been updated to have ${answers.manager} as their manager.`
+      `${answer.employee} has been updated to have ${answer.manager} as their manager.`
     );
     menu();
   } catch (error) {
@@ -441,36 +441,30 @@ function updateEmployeeManager() {
 }
 
 // delete employees
-function removeEmployee() {
-  let employeeList;
+async function removeEmployee() {
+  try {
+    const employeeList = await sql.getEmployeesAsEmployee();
 
-  sql
-    .getEmployeesAsEmployee()
-    .then((empList) => {
-      employeeList = empList;
-      return inquirer.prompt({
-        type: "list",
-        message: "Which employee would you like to remove? ",
-        choices: employeeList.map((emp) => emp.Employee),
-        name: "employee",
-      });
-    })
-    .then((answer) => {
-      const empId =
-        employeeList[
-          employeeList.findIndex((emp) => emp.Employee === answer.employee)
-        ].id;
-      return sql.deleteEmployee(empId).then(() => answer);
-    })
-    .then((answer) => {
-      console.log();
-      console.log(`${answer.employee} has been removed.`);
-
-      menu();
-    })
-    .catch((error) => {
-      inquirerErr(error);
+    const answer = await inquirer.prompt({
+      type: "list",
+      message: "Which employee would you like to remove? ",
+      choices: employeeList.map((emp) => emp.Employee),
+      name: "employee",
     });
+
+    const empId =
+      employeeList[
+        employeeList.findIndex((emp) => emp.Employee === answer.employee)
+      ].id;
+    await sql.deleteEmployee(empId);
+
+    console.log();
+    console.log(`${answer.employee} has been removed.`);
+
+    menu();
+  } catch (error) {
+    inquirerErr(error);
+  }
 }
 
 // delete roles
