@@ -522,39 +522,30 @@ async function removeDepartment() {
 }
 
 // View the total utilized budget of a department -- ie the combined salaries of all employees in that department
-function viewDepartmentBudget() {
-  let departmentList;
-
-  sql
-    .getDepartmentList()
-    .then((deptList) => {
-      departmentList = deptList;
-      return inquirer.prompt({
-        type: "list",
-        message: "Which department's budget would you like to see?",
-        choices: departmentList.map((dept) => dept.name),
-        name: "dept",
-      });
-    })
-    .then((answer) => {
-      deptId =
-        departmentList[
-          departmentList.findIndex((dept) => dept.name === answer.dept)
-        ].id;
-
-      return sql.getDepartmentBudget().then((budget) => {
-        return { budget: budget, answer: answer };
-      });
-    })
-    .then(({ budget, answer }) => {
-      const budgetAmt = budget[0].Budget || 0;
-
-      console.log();
-      console.log(`The budget for ${answer.dept} is $${budgetAmt}.`);
-
-      menu();
-    })
-    .catch((error) => {
-      inquirerErr(error);
+async function viewDepartmentBudget() {
+  try {
+    const departmentList = await sql.getDepartmentList();
+    const answer = await inquirer.prompt({
+      type: "list",
+      message: "Which department's budget would you like to see?",
+      choices: departmentList.map((dept) => dept.name),
+      name: "dept",
     });
+
+    const deptId =
+      departmentList[
+        departmentList.findIndex((dept) => dept.name === answer.dept)
+      ].id;
+
+    const budget = await sql.getDepartmentBudget(deptId);
+    // console.log(budget);
+    const budgetAmt = budget[0].Budget || 0;
+
+    console.log();
+    console.log(`The budget for ${answer.dept} is $${budgetAmt}.`);
+
+    menu();
+  } catch (error) {
+    inquirerErr(error);
+  }
 }

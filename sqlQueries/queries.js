@@ -93,7 +93,7 @@ const getOnlyManagersAsManager = () =>
     });
   });
 
-const getDepartmentBudget = () =>
+const getDepartmentBudget = (deptId) =>
   new Promise((resolve, reject) => {
     const query = `SELECT SUM(salary) AS 'Budget'
     FROM role
@@ -101,7 +101,7 @@ const getDepartmentBudget = () =>
         JOIN department ON role.department_id = department.id 
     WHERE department_id = ?;`;
 
-    connection.query(query, [deptId], (err, budget) => {
+    connection.query(query, deptId, (err, budget) => {
       if (err) reject(err);
       resolve(budget);
     });
